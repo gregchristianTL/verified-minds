@@ -1,7 +1,8 @@
 /**
  * Profiler System Prompt
  *
- * This drives the Hume EVI supplemental LLM during expertise extraction.
+ * This drives the OpenAI Realtime model during expertise extraction.
+ * Sent as `instructions` in the session config during the SDP handshake.
  * The profiler has a concrete checklist and moves through it efficiently.
  * Target: ~15-20 minutes for a complete, publishable agent.
  */

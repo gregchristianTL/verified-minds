@@ -1,18 +1,20 @@
 /**
- * Hume EVI Tool Definitions
+ * OpenAI Realtime API Tool Definitions
  *
- * These define the function tools available to the supplemental LLM
- * during voice interviews. Configured in Hume platform or via API.
+ * These define the function tools available to the Realtime model
+ * during voice interviews. Passed via session.tools in the SDP handshake.
  */
 
-export interface HumeToolDefinition {
+export interface RealtimeToolDefinition {
+  type: "function";
   name: string;
   description: string;
   parameters: Record<string, unknown>;
 }
 
-export const PROFILER_TOOLS: HumeToolDefinition[] = [
+export const PROFILER_TOOLS: RealtimeToolDefinition[] = [
   {
+    type: "function",
     name: "save_knowledge",
     description:
       "Save an extracted knowledge nugget from the expert. Call this immediately when the expert shares a valuable insight — don't batch.",
@@ -21,11 +23,13 @@ export const PROFILER_TOOLS: HumeToolDefinition[] = [
       properties: {
         domain: {
           type: "string",
-          description: "The expertise domain (e.g., 'neapolitan pizza', 'BMW engines')",
+          description:
+            "The expertise domain (e.g., 'neapolitan pizza', 'BMW engines')",
         },
         topic: {
           type: "string",
-          description: "Specific topic label (e.g., 'dough hydration', 'turbo diagnostics')",
+          description:
+            "Specific topic label (e.g., 'dough hydration', 'turbo diagnostics')",
         },
         content: {
           type: "string",
@@ -48,6 +52,7 @@ export const PROFILER_TOOLS: HumeToolDefinition[] = [
     },
   },
   {
+    type: "function",
     name: "assess_expertise",
     description:
       "Update confidence assessment for a domain. Call when you complete a phase or learn enough to rate a domain.",
@@ -88,6 +93,7 @@ export const PROFILER_TOOLS: HumeToolDefinition[] = [
     },
   },
   {
+    type: "function",
     name: "fetch_link",
     description:
       "Ingest content from a URL the expert mentions. Use to cross-reference their claims or extract knowledge from their documents.",
@@ -107,6 +113,7 @@ export const PROFILER_TOOLS: HumeToolDefinition[] = [
     },
   },
   {
+    type: "function",
     name: "create_agent",
     description:
       "Create the expert's AI sub-agent. Call ONLY when phases 1-3 are complete (domain ID, boundaries, unique signal).",
@@ -115,7 +122,8 @@ export const PROFILER_TOOLS: HumeToolDefinition[] = [
       properties: {
         name: {
           type: "string",
-          description: "Display name for the agent (e.g., 'Maria's Pizza Expertise')",
+          description:
+            "Display name for the agent (e.g., 'Maria's Pizza Expertise')",
         },
         domains: {
           type: "array",
@@ -124,7 +132,8 @@ export const PROFILER_TOOLS: HumeToolDefinition[] = [
         },
         bio: {
           type: "string",
-          description: "One-paragraph bio summarizing who this expert is and what they know",
+          description:
+            "One-paragraph bio summarizing who this expert is and what they know",
         },
       },
       required: ["name", "domains", "bio"],

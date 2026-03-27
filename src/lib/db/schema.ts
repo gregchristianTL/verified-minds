@@ -35,7 +35,7 @@ export const extractionSessions = sqliteTable("extraction_sessions", {
   profileId: text("profile_id")
     .notNull()
     .references(() => expertProfiles.id),
-  humeChatGroupId: text("hume_chat_group_id"),
+  realtimeSessionId: text("realtime_session_id"),
   durationSeconds: integer("duration_seconds"),
   knowledgeItemsAdded: integer("knowledge_items_added").default(0),
   /** JSON array of domains covered this session */

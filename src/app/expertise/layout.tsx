@@ -13,15 +13,18 @@ export default function ExpertiseLayout({
 }): React.ReactElement {
   const pathname = usePathname();
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* Top bar with toggles */}
-      <header className="fixed top-0 right-0 z-50 flex items-center gap-1 p-3">
-        <SoundToggle />
-        <ThemeToggle />
-      </header>
+  const isFullscreen = pathname === "/expertise/interview" || pathname === "/expertise/done";
 
-      <main className="flex-1 flex flex-col items-center justify-center px-5 py-12">
+  return (
+    <div className={`min-h-screen flex flex-col ${isFullscreen ? "" : "ascii-texture"}`}>
+      {!isFullscreen && (
+        <header className="fixed top-0 right-0 z-50 flex items-center gap-1 p-3">
+          <SoundToggle />
+          <ThemeToggle />
+        </header>
+      )}
+
+      <main className={`flex-1 flex flex-col items-center justify-center ${isFullscreen ? "" : "px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={pathname}

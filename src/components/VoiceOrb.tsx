@@ -10,8 +10,8 @@ interface VoiceOrbProps {
 }
 
 /**
- * Warm, friendly audio-reactive orb.
- * Soft indigo when listening, gentle green when complete.
+ * Warm, audio-reactive orb.
+ * Amber/ember when listening, gentle green when complete.
  * Adapts colors for dark mode.
  */
 export default function VoiceOrb({
@@ -57,7 +57,6 @@ export default function VoiceOrb({
         : Math.sin(time * 0.8) * 6;
       const radius = pulse + breath;
 
-      // Glow - adapts to dark mode with stronger glow
       const glowRadius = radius * 2.5;
       const glow = ctx.createRadialGradient(cx, cy, radius * 0.3, cx, cy, glowRadius);
       const glowMul = isDark ? 1.5 : 1;
@@ -67,19 +66,18 @@ export default function VoiceOrb({
         glow.addColorStop(0.5, `rgba(34, 197, 94, ${0.04 * glowMul})`);
         glow.addColorStop(1, "rgba(34, 197, 94, 0)");
       } else if (isActive) {
-        glow.addColorStop(0, `rgba(99, 102, 241, ${0.14 * glowMul})`);
-        glow.addColorStop(0.5, `rgba(99, 102, 241, ${0.05 * glowMul})`);
-        glow.addColorStop(1, "rgba(99, 102, 241, 0)");
+        glow.addColorStop(0, `rgba(232, 136, 26, ${0.14 * glowMul})`);
+        glow.addColorStop(0.5, `rgba(232, 136, 26, ${0.05 * glowMul})`);
+        glow.addColorStop(1, "rgba(232, 136, 26, 0)");
       } else {
-        glow.addColorStop(0, `rgba(99, 102, 241, ${0.08 * glowMul})`);
-        glow.addColorStop(0.5, `rgba(99, 102, 241, ${0.02 * glowMul})`);
-        glow.addColorStop(1, "rgba(99, 102, 241, 0)");
+        glow.addColorStop(0, `rgba(232, 136, 26, ${0.08 * glowMul})`);
+        glow.addColorStop(0.5, `rgba(232, 136, 26, ${0.02 * glowMul})`);
+        glow.addColorStop(1, "rgba(232, 136, 26, 0)");
       }
 
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, size, size);
 
-      // Main orb
       ctx.beginPath();
       const smoothness = isActive ? 0.6 : 0.2;
       for (let i = 0; i <= 360; i++) {
@@ -96,7 +94,6 @@ export default function VoiceOrb({
       }
       ctx.closePath();
 
-      // Fill - brighter in dark mode
       const orbFill = ctx.createRadialGradient(
         cx - radius * 0.2,
         cy - radius * 0.25,
@@ -113,13 +110,13 @@ export default function VoiceOrb({
         orbFill.addColorStop(0.6, `rgba(34, 197, 94, ${0.2 * fillMul})`);
         orbFill.addColorStop(1, `rgba(22, 163, 74, ${0.1 * fillMul})`);
       } else if (isActive) {
-        orbFill.addColorStop(0, `rgba(165, 180, 252, ${0.3 * fillMul})`);
-        orbFill.addColorStop(0.6, `rgba(99, 102, 241, ${0.15 * fillMul})`);
-        orbFill.addColorStop(1, `rgba(79, 70, 229, ${0.08 * fillMul})`);
+        orbFill.addColorStop(0, `rgba(240, 160, 96, ${0.3 * fillMul})`);
+        orbFill.addColorStop(0.6, `rgba(232, 136, 26, ${0.15 * fillMul})`);
+        orbFill.addColorStop(1, `rgba(200, 90, 20, ${0.08 * fillMul})`);
       } else {
-        orbFill.addColorStop(0, `rgba(165, 180, 252, ${0.15 * fillMul})`);
-        orbFill.addColorStop(0.6, `rgba(99, 102, 241, ${0.08 * fillMul})`);
-        orbFill.addColorStop(1, `rgba(79, 70, 229, ${0.03 * fillMul})`);
+        orbFill.addColorStop(0, `rgba(240, 160, 96, ${0.15 * fillMul})`);
+        orbFill.addColorStop(0.6, `rgba(232, 136, 26, ${0.08 * fillMul})`);
+        orbFill.addColorStop(1, `rgba(200, 90, 20, ${0.03 * fillMul})`);
       }
 
       ctx.fillStyle = orbFill;
@@ -127,7 +124,7 @@ export default function VoiceOrb({
 
       ctx.strokeStyle = isComplete
         ? `rgba(34, 197, 94, ${isDark ? 0.4 : 0.25})`
-        : `rgba(99, 102, 241, ${isActive ? (isDark ? 0.35 : 0.2) : (isDark ? 0.2 : 0.1)})`;
+        : `rgba(232, 136, 26, ${isActive ? (isDark ? 0.35 : 0.2) : (isDark ? 0.2 : 0.1)})`;
       ctx.lineWidth = 1.5;
       ctx.stroke();
 

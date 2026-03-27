@@ -22,5 +22,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     verificationLevel: proof.verification_level ?? "device",
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, walletAddress: walletAddress ?? null });
 }

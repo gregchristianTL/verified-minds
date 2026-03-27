@@ -16,13 +16,13 @@ interface ExpertCardProps {
 }
 
 const AVATAR_COLORS = [
-  "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400",
   "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400",
+  "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400",
   "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
   "bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400",
   "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400",
   "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400",
-  "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400",
+  "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400",
   "bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-400",
 ];
 
@@ -79,7 +79,7 @@ export default function ExpertCard({
               </div>
             </div>
 
-            <span className="text-muted-foreground text-sm whitespace-nowrap font-medium">
+            <span className="font-mono text-muted-foreground text-sm whitespace-nowrap font-medium">
               ${parseFloat(queryPrice).toFixed(2)}
             </span>
           </CardContent>

@@ -47,7 +47,7 @@ export default function MarketplacePage(): React.ReactElement {
       animate="animate"
     >
       <motion.div className="text-center space-y-2" variants={fadeInUp} transition={gentle}>
-        <h1 className="text-2xl font-semibold text-foreground">
+        <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
           Ask a Real Expert
         </h1>
         <p className="text-muted-foreground text-sm">
@@ -64,7 +64,7 @@ export default function MarketplacePage(): React.ReactElement {
                 Be the first to share your expertise.
               </p>
               <Link
-                href="/expertise"
+                href="/"
                 className={buttonVariants({ className: "mt-4" })}
                 onClick={() => play("click")}
               >
@@ -95,7 +95,7 @@ export default function MarketplacePage(): React.ReactElement {
 
       <motion.div className="text-center pt-2" variants={fadeInUp} transition={gentle}>
         <Link
-          href="/expertise"
+          href="/"
           className="text-muted-foreground text-sm hover:text-primary transition-colors"
           onClick={() => play("navigate")}
         >
