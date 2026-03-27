@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { knowledgeItems } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getProfile, updateProfile } from "@/lib/services/profiles";
-import { buildAndPublishAgent } from "@/lib/hume/agent-factory";
+import { buildAndPublishAgent } from "@/lib/adin/agent-factory";
 import type { KnowledgeItem, DomainConfidence } from "@/types";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

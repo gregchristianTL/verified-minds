@@ -64,7 +64,7 @@ export default function MarketplacePage(): React.ReactElement {
                 Be the first to share your expertise.
               </p>
               <Link
-                href="/expertise"
+                href="/"
                 className={buttonVariants({ className: "mt-4" })}
                 onClick={() => play("click")}
               >
@@ -95,7 +95,7 @@ export default function MarketplacePage(): React.ReactElement {
 
       <motion.div className="text-center pt-2" variants={fadeInUp} transition={gentle}>
         <Link
-          href="/expertise"
+          href="/"
           className="text-muted-foreground text-sm hover:text-primary transition-colors"
           onClick={() => play("navigate")}
         >

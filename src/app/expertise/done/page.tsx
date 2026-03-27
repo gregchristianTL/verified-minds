@@ -116,7 +116,7 @@ export default function DonePage(): React.ReactElement {
             <Card className="text-center">
               <CardContent className="pt-6 space-y-4">
                 <p className="text-muted-foreground">No profile found.</p>
-                <Link href="/expertise" className={buttonVariants({ variant: "link" })}>
+                <Link href="/" className={buttonVariants({ variant: "link" })}>
                   Get started
                 </Link>
               </CardContent>

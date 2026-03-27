@@ -4,7 +4,7 @@ import { eq, desc } from "drizzle-orm";
 
 export interface CreateSessionInput {
   profileId: string;
-  humeChatGroupId?: string | null;
+  realtimeSessionId?: string | null;
 }
 
 /** Create a new extraction session */
@@ -16,7 +16,7 @@ export function createSession(input: CreateSessionInput): string {
     .values({
       id,
       profileId: input.profileId,
-      humeChatGroupId: input.humeChatGroupId ?? null,
+      realtimeSessionId: input.realtimeSessionId ?? null,
       createdAt: now,
     })
     .run();

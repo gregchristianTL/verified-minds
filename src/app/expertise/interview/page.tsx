@@ -3,50 +3,35 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { VoiceProvider, useVoice } from "@humeai/voice-react";
 import { Howl } from "howler";
 import AsciiLandscape from "@/components/AsciiLandscape";
 import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { buildProfilerPrompt } from "@/lib/hume/profiler-prompt";
 import { fadeInUp, gentle } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { useSoundStore } from "@/providers/SoundProvider";
 import { CheckCircle2, AlertTriangle, Mic } from "lucide-react";
 import BalanceSheet from "@/components/BalanceSheet";
 
-async function fetchResumeContext(profileId: string): Promise<{
-  existingDomains: string[];
-  existingConfidence: Record<string, number>;
-  knowledgeCount: number;
-  displayName: string;
-} | null> {
-  try {
-    const res = await fetch(`/api/expertise/earnings?profileId=${profileId}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return {
-      existingDomains: data.domains ?? [],
-      existingConfidence: {},
-      knowledgeCount: data.transactions?.length ?? 0,
-      displayName: data.displayName ?? "Expert",
-    };
-  } catch {
-    return null;
-  }
+/** Realtime API server event shape (subset we care about) */
+interface RealtimeEvent {
+  type: string;
+  event_id?: string;
+  response?: {
+    output?: {
+      type: string;
+      name?: string;
+      arguments?: string;
+      call_id?: string;
+    }[];
+  };
 }
 
-function InterviewInner(): React.ReactElement {
+export default function InterviewPage(): React.ReactElement {
   const router = useRouter();
   const { play } = useSoundSystem();
   const isMuted = useSoundStore((s) => s.isMuted);
-  const {
-    connect,
-    disconnect,
-    messages,
-    sendToolMessage,
-  } = useVoice();
 
   const [isConnected, setIsConnected] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -56,27 +41,36 @@ function InterviewInner(): React.ReactElement {
   const [statusHint, setStatusHint] = useState("Tap to begin your interview");
   const [userIdentity, setUserIdentity] = useState<string>("");
   const [balance, setBalance] = useState<string>("0.00");
-  const [micPermission, setMicPermission] = useState<"granted" | "denied" | "prompt" | "unknown">("unknown");
+  const [micPermission, setMicPermission] = useState<
+    "granted" | "denied" | "prompt" | "unknown"
+  >("unknown");
   const [deviceMuted, setDeviceMuted] = useState(false);
   const [balanceOpen, setBalanceOpen] = useState(false);
+
   const profileIdRef = useRef<string>("");
   const ambientRef = useRef<Howl | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const dcRef = useRef<RTCDataChannel | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number>(0);
 
+  // ── Bootstrap: load profileId, wallet, balance ──────────────────────
   useEffect(() => {
     profileIdRef.current = sessionStorage.getItem("profileId") ?? "";
     setUserIdentity(
       sessionStorage.getItem("walletAddress") ||
-      sessionStorage.getItem("userId") ||
-      "",
+        sessionStorage.getItem("userId") ||
+        "",
     );
     if (!profileIdRef.current) {
       router.push("/expertise");
       return;
     }
 
-    // Fetch current balance
     fetch(`/api/expertise/earnings?profileId=${profileIdRef.current}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.totalEarnings) {
           setBalance(parseFloat(data.totalEarnings).toFixed(2));
@@ -85,7 +79,7 @@ function InterviewInner(): React.ReactElement {
       .catch(() => {});
   }, [router]);
 
-  // Check microphone permission
+  // ── Microphone permission check ─────────────────────────────────────
   useEffect(() => {
     if (!navigator.permissions) {
       setMicPermission("unknown");
@@ -102,11 +96,13 @@ function InterviewInner(): React.ReactElement {
       .catch(() => setMicPermission("unknown"));
   }, []);
 
-  // Detect device muted (volume = 0) via a silent AudioContext probe
+  // ── Device-muted detection (silent AudioContext probe) ──────────────
   useEffect(() => {
     async function checkMuted(): Promise<void> {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         const ctx = new AudioContext();
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
@@ -130,7 +126,6 @@ function InterviewInner(): React.ReactElement {
             setDeviceMuted(false);
           }
 
-          // Only flag muted after sustained silence across all sampled frames
           if (totalFrames >= requiredFrames) {
             setDeviceMuted(silentFrames >= requiredFrames);
             cleanup();
@@ -155,6 +150,7 @@ function InterviewInner(): React.ReactElement {
     }
   }, [micPermission]);
 
+  // ── Ambient sound tied to connection state ──────────────────────────
   useEffect(() => {
     if (isConnected && !isMuted && !ambientRef.current) {
       const ambient = new Howl({
@@ -177,6 +173,7 @@ function InterviewInner(): React.ReactElement {
     };
   }, [isConnected, isMuted]);
 
+  // ── Ambient volume reacts to audio level ────────────────────────────
   useEffect(() => {
     if (ambientRef.current && isConnected) {
       const targetVol = 0.04 + audioLevel * 0.08;
@@ -184,32 +181,30 @@ function InterviewInner(): React.ReactElement {
     }
   }, [audioLevel, isConnected]);
 
-  useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (last?.type === "user_message") {
-      setAudioLevel(0.6);
-      setStatusHint("Listening...");
-      setTimeout(() => setAudioLevel(0.1), 300);
-    }
-    if (last?.type === "assistant_message") {
-      setAudioLevel(0.4);
-      setStatusHint("ADIN is speaking...");
-      setTimeout(() => setAudioLevel(0.1), 500);
-    }
-  }, [messages]);
+  // ── Mic audio-level loop (feeds AsciiLandscape) ─────────────────────
+  const startAudioLevelLoop = useCallback(() => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
 
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const tick = (): void => {
+      analyser.getByteFrequencyData(buf);
+      const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+      setAudioLevel(avg / 255);
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  // ── Tool call handler ────────────────────────────────────────────────
   const handleToolCall = useCallback(
-    async (toolCall: {
-      name: string;
-      parameters: string;
-      tool_call_id: string;
-    }) => {
-      const params = JSON.parse(toolCall.parameters);
+    async (name: string, args: string, callId: string) => {
+      const params = JSON.parse(args);
       const profileId = profileIdRef.current;
       let result: Record<string, unknown> = {};
 
       try {
-        switch (toolCall.name) {
+        switch (name) {
           case "save_knowledge": {
             setStatusHint("Saving an insight...");
             const res = await fetch("/api/expertise/tools/save-knowledge", {
@@ -262,7 +257,7 @@ function InterviewInner(): React.ReactElement {
             break;
           }
           default:
-            result = { error: `Unknown tool: ${toolCall.name}` };
+            result = { error: `Unknown tool: ${name}` };
         }
       } catch (err) {
         result = {
@@ -270,67 +265,195 @@ function InterviewInner(): React.ReactElement {
         };
       }
 
-      sendToolMessage({
-        toolCallId: toolCall.tool_call_id,
-        content: JSON.stringify(result),
-      } as Parameters<typeof sendToolMessage>[0]);
+      // Return tool result to the model, then trigger its next response
+      const dc = dcRef.current;
+      if (dc?.readyState === "open") {
+        dc.send(
+          JSON.stringify({
+            type: "conversation.item.create",
+            item: {
+              type: "function_call_output",
+              call_id: callId,
+              output: JSON.stringify(result),
+            },
+          }),
+        );
+        dc.send(JSON.stringify({ type: "response.create" }));
+      }
     },
-    [router, sendToolMessage, play],
+    [router, play],
   );
 
-  useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (
-      last &&
-      "type" in last &&
-      (last as Record<string, unknown>).type === "tool_call"
-    ) {
-      const tc = last as unknown as {
-        name: string;
-        parameters: string;
-        tool_call_id: string;
-      };
-      handleToolCall(tc);
-    }
-  }, [messages, handleToolCall]);
+  // ── Data channel event router ───────────────────────────────────────
+  const onDataChannelMessage = useCallback(
+    (ev: MessageEvent) => {
+      const event: RealtimeEvent = JSON.parse(ev.data);
 
+      switch (event.type) {
+        case "input_audio_buffer.speech_started":
+          setAudioLevel(0.6);
+          setStatusHint("Listening...");
+          break;
+
+        case "input_audio_buffer.speech_stopped":
+          setAudioLevel(0.1);
+          break;
+
+        case "response.output_audio_transcript.delta":
+          setStatusHint("ADIN is speaking...");
+          setAudioLevel(0.4);
+          break;
+
+        case "response.done": {
+          setStatusHint("ADIN is listening — just talk naturally");
+          setAudioLevel(0.1);
+
+          // Check for function calls in the response output
+          const outputs = event.response?.output ?? [];
+          for (const item of outputs) {
+            if (
+              item.type === "function_call" &&
+              item.name &&
+              item.arguments &&
+              item.call_id
+            ) {
+              handleToolCall(item.name, item.arguments, item.call_id);
+            }
+          }
+          break;
+        }
+
+        case "error":
+          console.error("[realtime] Server error:", event);
+          break;
+
+        default:
+          break;
+      }
+    },
+    [handleToolCall],
+  );
+
+  // ── Start interview: WebRTC + data channel ──────────────────────────
   async function handleStart(): Promise<void> {
     try {
       play("click");
       setStatusHint("Connecting...");
 
-      const tokenRes = await fetch("/api/auth/hume-token");
-      const { accessToken } = await tokenRes.json();
-      const ctx = await fetchResumeContext(profileIdRef.current);
-      const systemPrompt = buildProfilerPrompt(ctx ?? undefined);
+      // Acquire mic
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+      micStreamRef.current = micStream;
 
-      await connect({
-        auth: { type: "accessToken", value: accessToken },
-        configId: process.env.NEXT_PUBLIC_HUME_CONFIG_ID,
-        sessionSettings: { systemPrompt },
-      } as Parameters<typeof connect>[0]);
+      // Set up AnalyserNode for live audio-level visualization
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(micStream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
 
-      if (ctx?.knowledgeCount) {
-        setKnowledgeCount(ctx.knowledgeCount);
-        setProgress(Math.min(ctx.knowledgeCount * 5, 60));
+      // Create peer connection
+      const pc = new RTCPeerConnection();
+      pcRef.current = pc;
+
+      // Remote audio playback
+      const audioEl = document.createElement("audio");
+      audioEl.autoplay = true;
+      audioElRef.current = audioEl;
+      pc.ontrack = (e) => {
+        audioEl.srcObject = e.streams[0];
+      };
+
+      // Add mic track
+      pc.addTrack(micStream.getTracks()[0]);
+
+      // Data channel for Realtime API events
+      const dc = pc.createDataChannel("oai-events");
+      dcRef.current = dc;
+
+      dc.addEventListener("open", () => {
+        setStatusHint("ADIN is listening — just talk naturally");
+      });
+      dc.addEventListener("message", onDataChannelMessage);
+
+      // SDP offer → our server → OpenAI → answer SDP
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      const profileId = profileIdRef.current;
+      const sdpResponse = await fetch(
+        `/api/auth/openai-realtime?profileId=${encodeURIComponent(profileId)}`,
+        {
+          method: "POST",
+          body: offer.sdp,
+          headers: { "Content-Type": "application/sdp" },
+        },
+      );
+
+      if (!sdpResponse.ok) {
+        const errBody = await sdpResponse.text();
+        throw new Error(`SDP handshake failed: ${errBody}`);
+      }
+
+      const answerSdp = await sdpResponse.text();
+      await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
+      // Fetch existing progress for resume sessions
+      try {
+        const ctxRes = await fetch(
+          `/api/expertise/earnings?profileId=${profileId}`,
+        );
+        if (ctxRes.ok) {
+          const ctxData = await ctxRes.json();
+          const count = ctxData.transactions?.length ?? 0;
+          if (count > 0) {
+            setKnowledgeCount(count);
+            setProgress(Math.min(count * 5, 60));
+          }
+        }
+      } catch {
+        // Non-critical — just skip resume context on the UI side
       }
 
       setIsConnected(true);
-      setStatusHint("ADIN is listening — just talk naturally");
-    } catch {
+      startAudioLevelLoop();
+    } catch (err) {
+      console.error("[interview] Connection failed:", err);
       setStatusHint("Connection failed — tap to retry");
       play("error");
     }
   }
 
+  // ── End interview: tear down WebRTC ─────────────────────────────────
   function handleEnd(): void {
     play("click");
-    disconnect();
+    teardown();
     setIsConnected(false);
     router.push("/expertise/done");
   }
 
-  const showMicAlert = micPermission === "denied" || micPermission === "prompt";
+  function teardown(): void {
+    cancelAnimationFrame(animFrameRef.current);
+    dcRef.current?.close();
+    pcRef.current?.close();
+    micStreamRef.current?.getTracks().forEach((t) => t.stop());
+    if (audioElRef.current) {
+      audioElRef.current.srcObject = null;
+    }
+    dcRef.current = null;
+    pcRef.current = null;
+    micStreamRef.current = null;
+    analyserRef.current = null;
+  }
+
+  useEffect(() => {
+    return () => teardown();
+  }, []);
+
+  const showMicAlert =
+    micPermission === "denied" || micPermission === "prompt";
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-black">
@@ -345,8 +468,12 @@ function InterviewInner(): React.ReactElement {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2 backdrop-blur-md bg-black/30 rounded-full px-4 py-2">
-          <span className="text-sm font-heading text-white font-normal tracking-tight">Verified Minds</span>
-          <span className="text-sm font-heading text-white/30 font-semibold tracking-tight">v0.1.0</span>
+          <span className="text-sm font-heading text-white font-normal tracking-tight">
+            Verified Minds
+          </span>
+          <span className="text-sm font-heading text-white/30 font-semibold tracking-tight">
+            v0.1.0
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -355,8 +482,12 @@ function InterviewInner(): React.ReactElement {
             className="flex items-center gap-2 backdrop-blur-md bg-black/30 rounded-full px-4 py-2
                        hover:bg-white/10 active:scale-[0.97] transition-all cursor-pointer"
           >
-            <span className="text-xs text-white/50 font-mono uppercase tracking-wider">Balance</span>
-            <span className="text-sm font-heading text-white font-semibold">{balance} <span className="text-white/50">USDC</span></span>
+            <span className="text-xs text-white/50 font-mono uppercase tracking-wider">
+              Balance
+            </span>
+            <span className="text-sm font-heading text-white font-semibold">
+              {balance} <span className="text-white/50">USDC</span>
+            </span>
           </button>
           <AnimatePresence>
             {deviceMuted && (
@@ -380,7 +511,9 @@ function InterviewInner(): React.ReactElement {
                            rounded-full px-3 py-1.5 text-xs text-red-300"
               >
                 <Mic className="size-3.5 shrink-0" />
-                <span>{micPermission === "denied" ? "Mic blocked" : "Mic required"}</span>
+                <span>
+                  {micPermission === "denied" ? "Mic blocked" : "Mic required"}
+                </span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -404,7 +537,6 @@ function InterviewInner(): React.ReactElement {
 
       {/* Controls overlay */}
       <div className="relative z-10 flex flex-col items-center gap-5 max-w-2xl px-6">
-
         <motion.p
           className="text-sm text-white/60 text-center max-w-[260px]"
           variants={fadeInUp}
@@ -513,7 +645,10 @@ function InterviewInner(): React.ReactElement {
                 desc: "Every time someone queries your agent, you get paid. Passive income, on-chain.",
               },
             ].map((item) => (
-              <div key={item.step} className="flex w-[240px] flex-col gap-1.5 text-left">
+              <div
+                key={item.step}
+                className="flex w-[240px] flex-col gap-1.5 text-left"
+              >
                 <span className="text-xs font-mono text-vm-amber tracking-widest">
                   {item.step}
                 </span>
@@ -529,13 +664,5 @@ function InterviewInner(): React.ReactElement {
         </motion.footer>
       )}
     </div>
-  );
-}
-
-export default function InterviewPage(): React.ReactElement {
-  return (
-    <VoiceProvider>
-      <InterviewInner />
-    </VoiceProvider>
   );
 }

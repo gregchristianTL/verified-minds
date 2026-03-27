@@ -54,7 +54,7 @@ export default function LegalPage(): React.ReactElement {
           href="/"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-12"
         >
-          <span aria-hidden>&larr;</span> Back to home
+          <span aria-hidden>&larr;</span> Back
         </Link>
 
         {/* Page header */}
