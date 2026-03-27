@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import ExpertCard from "@/components/ExpertCard";
+import { buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { staggerContainer, fadeInUp, gentle } from "@/lib/motion";
+import { useSoundSystem } from "@/hooks/useSoundSystem";
+import { Loader2 } from "lucide-react";
 
 interface ExpertListing {
   id: string;
@@ -16,6 +22,7 @@ interface ExpertListing {
 export default function MarketplacePage(): React.ReactElement {
   const [experts, setExperts] = useState<ExpertListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const { play } = useSoundSystem();
 
   useEffect(() => {
     fetch("/api/expertise/marketplace")
@@ -27,59 +34,74 @@ export default function MarketplacePage(): React.ReactElement {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-6 h-6 border-2 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" />
+        <Loader2 className="size-6 text-primary animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-lg space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-semibold text-[var(--foreground)]">
+    <motion.div
+      className="w-full max-w-lg space-y-6"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
+      <motion.div className="text-center space-y-2" variants={fadeInUp} transition={gentle}>
+        <h1 className="text-2xl font-semibold text-foreground">
           Ask a Real Expert
         </h1>
-        <p className="text-[var(--muted)] text-sm">
+        <p className="text-muted-foreground text-sm">
           Real humans, verified by World ID. Their knowledge, your questions.
         </p>
-      </div>
+      </motion.div>
 
       {experts.length === 0 ? (
-        <div className="text-center py-16 px-6 rounded-2xl bg-[var(--card)] shadow-[var(--shadow)]">
-          <p className="text-[var(--foreground)] font-medium">No experts yet</p>
-          <p className="text-[var(--muted)] text-sm mt-1">
-            Be the first to share your expertise.
-          </p>
-          <Link
-            href="/expertise"
-            className="inline-block mt-4 px-5 py-2 rounded-xl bg-[var(--accent)] text-white text-sm font-medium
-                       hover:opacity-90 transition-opacity"
-          >
-            Become an expert
-          </Link>
-        </div>
+        <motion.div variants={fadeInUp} transition={gentle}>
+          <Card className="text-center">
+            <CardContent className="py-16 px-6">
+              <p className="text-foreground font-medium">No experts yet</p>
+              <p className="text-muted-foreground text-sm mt-1">
+                Be the first to share your expertise.
+              </p>
+              <Link
+                href="/expertise"
+                className={buttonVariants({ className: "mt-4" })}
+                onClick={() => play("click")}
+              >
+                Become an expert
+              </Link>
+            </CardContent>
+          </Card>
+        </motion.div>
       ) : (
-        <div className="space-y-3">
-          {experts.map((expert) => (
-            <ExpertCard
+        <motion.div className="space-y-3" variants={staggerContainer}>
+          {experts.map((expert, i) => (
+            <motion.div
               key={expert.id}
-              id={expert.id}
-              displayName={expert.displayName}
-              bio={expert.bio}
-              domains={expert.domains}
-              queryPrice={expert.queryPrice}
-            />
+              variants={fadeInUp}
+              transition={{ ...gentle, delay: i * 0.08 }}
+            >
+              <ExpertCard
+                id={expert.id}
+                displayName={expert.displayName}
+                bio={expert.bio}
+                domains={expert.domains}
+                queryPrice={expert.queryPrice}
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
-      <div className="text-center pt-2">
+      <motion.div className="text-center pt-2" variants={fadeInUp} transition={gentle}>
         <Link
           href="/expertise"
-          className="text-[var(--muted)] text-sm hover:text-[var(--accent)] transition-colors"
+          className="text-muted-foreground text-sm hover:text-primary transition-colors"
+          onClick={() => play("navigate")}
         >
           Want to become an expert?
         </Link>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

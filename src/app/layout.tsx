@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "@/providers/ThemeProvider";
+import { SoundProvider } from "@/providers/SoundProvider";
 import "./globals.css";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Verified Minds",
@@ -23,8 +21,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className="min-h-screen">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen">
+        <ThemeProvider>
+          <SoundProvider>
+            {children}
+          </SoundProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
