@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #FAFAF9;
+  --foreground: #1C1917;
+  --accent: #6366F1;
+  --accent-light: #A5B4FC;
+  --accent-bg: #EEF2FF;
+  --success: #22C55E;
+  --success-bg: #F0FDF4;
+  --muted: #78716C;
+  --muted-light: #A8A29E;
+  --border: #E7E5E4;
+  --card: #FFFFFF;
+  --card-hover: #F5F5F4;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Smooth transitions for interactive elements */
+button, a, input {
+  transition: all 0.2s ease;
+}
+
+/* Custom scrollbar — subtle and friendly */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* Pulse animation for the "live" indicator */
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-gentle-pulse {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}

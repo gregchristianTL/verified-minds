@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+dist/
+db.sqlite
+db.sqlite-shm
+db.sqlite-wal
+.env
+.env.local
+*.tsbuildinfo
+drizzle/meta/
