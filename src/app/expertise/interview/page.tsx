@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Howl } from "howler";
 import AsciiLandscape from "@/components/AsciiLandscape";
-import ProgressBar from "@/components/ProgressBar";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fadeInUp, gentle } from "@/lib/motion";
@@ -372,13 +371,9 @@ export default function InterviewPage(): React.ReactElement {
       // Data channel for Realtime API events
       const dc = pc.createDataChannel("oai-events");
       dcRef.current = dc;
-
-      dc.addEventListener("open", () => {
-        setStatusHint("ADIN is listening — just talk naturally");
-      });
       dc.addEventListener("message", onDataChannelMessage);
 
-      // SDP offer → our server → OpenAI → answer SDP
+      // SDP offer → our server → OpenAI → answer SDP + session config
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
@@ -397,8 +392,14 @@ export default function InterviewPage(): React.ReactElement {
         throw new Error(`SDP handshake failed: ${errBody}`);
       }
 
-      const answerSdp = await sdpResponse.text();
+      const { sdp: answerSdp, sessionUpdate } = await sdpResponse.json();
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+
+      // Once the data channel opens, send session config (instructions, tools, etc.)
+      dc.addEventListener("open", () => {
+        dc.send(JSON.stringify(sessionUpdate));
+        setStatusHint("ADIN is listening — just talk naturally");
+      });
 
       // Fetch existing progress for resume sessions
       try {
@@ -520,20 +521,6 @@ export default function InterviewPage(): React.ReactElement {
         </div>
       </header>
 
-      {/* Progress bar - fixed below header when connected */}
-      <AnimatePresence>
-        {isConnected && (
-          <motion.div
-            className="fixed top-14 left-1/2 -translate-x-1/2 z-20"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          >
-            <ProgressBar progress={progress} itemCount={knowledgeCount} />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Controls overlay */}
       <div className="relative z-10 flex flex-col items-center gap-5 max-w-2xl px-6">

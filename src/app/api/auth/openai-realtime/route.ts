@@ -12,7 +12,10 @@ import { eq } from "drizzle-orm";
  * Unified-interface SDP handshake for OpenAI Realtime API.
  * The client sends its WebRTC SDP offer as the request body,
  * optionally with a profileId query param for resume context.
- * We combine it with the session config and forward to OpenAI.
+ *
+ * Returns JSON with:
+ * - sdp: the answer SDP to set as remote description
+ * - sessionUpdate: the session.update event payload to send over the data channel
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -28,19 +31,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing SDP body" }, { status: 400 });
   }
 
-  const profileId = req.nextUrl.searchParams.get("profileId") ?? "";
-  const resumeContext = buildResumeContext(profileId);
-  const instructions = buildProfilerPrompt(resumeContext ?? undefined);
-
+  // Minimal session config — only fields the unified interface accepts
   const sessionConfig = JSON.stringify({
     type: "realtime",
     model: "gpt-4o-realtime-preview",
-    voice: "coral",
-    instructions,
-    tools: PROFILER_TOOLS,
-    tool_choice: "auto",
-    input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
-    turn_detection: { type: "server_vad" },
+    audio: { output: { voice: "coral" } },
   });
 
   const form = new FormData();
@@ -67,9 +62,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const answerSdp = await response.text();
-    return new NextResponse(answerSdp, {
-      status: 200,
-      headers: { "Content-Type": "application/sdp" },
+
+    // Build the session.update payload for the client to send over the data channel
+    const profileId = req.nextUrl.searchParams.get("profileId") ?? "";
+    const resumeContext = buildResumeContext(profileId);
+    const instructions = buildProfilerPrompt(resumeContext ?? undefined);
+
+    return NextResponse.json({
+      sdp: answerSdp,
+      sessionUpdate: {
+        type: "session.update",
+        session: {
+          instructions,
+          tools: PROFILER_TOOLS,
+          tool_choice: "auto",
+          input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
+          turn_detection: { type: "server_vad" },
+        },
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
