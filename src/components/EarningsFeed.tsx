@@ -65,7 +65,7 @@ function AnimatedCounter({ value }: { value: number }): React.ReactElement {
     requestAnimationFrame(tick);
   }, [value]);
 
-  return <>${display.toFixed(2)}</>;
+  return <>{display.toFixed(2)} <span className="text-muted-foreground text-3xl">USDC</span></>;
 }
 
 export default function EarningsFeed({
@@ -132,7 +132,7 @@ export default function EarningsFeed({
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <span className="text-vm-success text-sm font-semibold">
-                          +${tx.amount.toFixed(2)}
+                          +{tx.amount.toFixed(2)} USDC
                         </span>
                         <span className="text-muted-foreground/60 text-xs">
                           {timeAgo(tx.createdAt)}

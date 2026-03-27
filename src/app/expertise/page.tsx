@@ -1,106 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { VerificationLevel } from "@worldcoin/minikit-js";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useWorldVerify } from "@/hooks/useWorldVerify";
 import { staggerContainer, fadeInUp, scaleIn, gentle } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { Loader2, Mic, AlertCircle } from "lucide-react";
 
 export default function ExpertiseLanding(): React.ReactElement {
-  const router = useRouter();
   const { play } = useSoundSystem();
-  const [verifying, setVerifying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleVerify(): Promise<void> {
-    play("click");
-    setVerifying(true);
-    setError(null);
-
-    try {
-      const isMiniKit =
-        typeof window !== "undefined" && "MiniKit" in window;
-
-      if (isMiniKit) {
-        const { MiniKit } = await import("@worldcoin/minikit-js");
-
-        if (!MiniKit.isInstalled()) {
-          setError("Please open this in World App");
-          play("error");
-          setVerifying(false);
-          return;
-        }
-
-        const result = await MiniKit.commandsAsync.verify({
-          action: process.env.NEXT_PUBLIC_WORLD_ACTION ?? "verify-expertise",
-          verification_level: VerificationLevel.Device,
-        });
-
-        if (!result.finalPayload) {
-          setError("Verification cancelled");
-          play("error");
-          setVerifying(false);
-          return;
-        }
-
-        const res = await fetch("/api/expertise/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ proof: result.finalPayload }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-
-        sessionStorage.setItem("profileId", data.profileId);
-        sessionStorage.setItem("userId", data.userId);
-
-        play("success");
-        if (data.profileStatus === "live") {
-          router.push("/expertise/done");
-        } else {
-          router.push("/expertise/interview");
-        }
-      } else {
-        const res = await fetch("/api/expertise/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            proof: {
-              merkle_root: "demo",
-              nullifier_hash: `demo-${Date.now()}`,
-              proof: "demo",
-              verification_level: "device",
-            },
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
-
-        sessionStorage.setItem("profileId", data.profileId);
-        sessionStorage.setItem("userId", data.userId);
-
-        play("success");
-        if (data.profileStatus === "live") {
-          router.push("/expertise/done");
-        } else {
-          router.push("/expertise/interview");
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
-      play("error");
-    } finally {
-      setVerifying(false);
-    }
-  }
+  const { verify, verifying, error } = useWorldVerify();
 
   const steps = [
     { step: "1", label: "Verify you're real" },
@@ -123,7 +35,7 @@ export default function ExpertiseLanding(): React.ReactElement {
       </motion.div>
 
       <motion.div className="space-y-3" variants={fadeInUp} transition={gentle}>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
           Your expertise has value
         </h1>
         <p className="text-muted-foreground text-base leading-relaxed">
@@ -159,7 +71,7 @@ export default function ExpertiseLanding(): React.ReactElement {
 
       <motion.div className="space-y-3" variants={fadeInUp} transition={gentle}>
         <Button
-          onClick={handleVerify}
+          onClick={verify}
           disabled={verifying}
           size="lg"
           className="w-full py-6 rounded-2xl text-base font-medium shadow-lg
