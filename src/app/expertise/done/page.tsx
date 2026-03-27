@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import EarningsFeed from "@/components/EarningsFeed";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { staggerContainer, fadeInUp, scaleIn, gentle } from "@/lib/motion";
+import { useSoundSystem } from "@/hooks/useSoundSystem";
+import { Loader2 } from "lucide-react";
 
 interface EarningsData {
   totalEarnings: string;
@@ -22,6 +29,7 @@ interface EarningsData {
 export default function DonePage(): React.ReactElement {
   const [data, setData] = useState<EarningsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { play } = useSoundSystem();
 
   useEffect(() => {
     const profileId = sessionStorage.getItem("profileId");
@@ -36,7 +44,14 @@ export default function DonePage(): React.ReactElement {
           `/api/expertise/earnings?profileId=${profileId}`,
         );
         if (res.ok) {
-          setData(await res.json());
+          const newData: EarningsData = await res.json();
+          setData((prev) => {
+            // Play success sound when new transactions arrive
+            if (prev && newData.transactions.length > prev.transactions.length) {
+              play("success");
+            }
+            return newData;
+          });
         }
       } finally {
         setLoading(false);
@@ -46,57 +61,85 @@ export default function DonePage(): React.ReactElement {
     load();
     const interval = setInterval(load, 10_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [play]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin" />
+        <Loader2 className="size-6 text-primary animate-spin" />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center space-y-4 p-8 rounded-2xl bg-[var(--card)] shadow-[var(--shadow)]">
-        <p className="text-[var(--muted)]">No profile found.</p>
-        <Link href="/expertise" className="text-[var(--accent)] text-sm font-medium">
-          Get started
-        </Link>
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={gentle}
+      >
+        <Card className="text-center">
+          <CardContent className="pt-6 space-y-4">
+            <p className="text-muted-foreground">No profile found.</p>
+            <Link href="/expertise" className={buttonVariants({ variant: "link" })}>
+              Get started
+            </Link>
+          </CardContent>
+        </Card>
+      </motion.div>
     );
   }
 
   return (
-    <div className="w-full flex flex-col items-center gap-6">
+    <motion.div
+      className="w-full flex flex-col items-center gap-6"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
       {/* Live badge */}
       {data.status === "live" && (
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--success-bg)]">
-          <div className="w-2 h-2 rounded-full bg-[var(--success)] animate-gentle-pulse" />
-          <span className="text-[var(--success)] text-xs font-medium">
+        <motion.div variants={scaleIn} transition={gentle}>
+          <Badge
+            variant="secondary"
+            className="gap-2 px-3.5 py-1.5 rounded-full bg-vm-success-bg text-vm-success border-0"
+          >
+            <motion.div
+              className="w-2 h-2 rounded-full bg-vm-success"
+              animate={{ opacity: [1, 0.4, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
             Your agent is live
-          </span>
-        </div>
+          </Badge>
+        </motion.div>
       )}
 
-      <EarningsFeed
-        totalEarnings={data.totalEarnings}
-        transactions={data.transactions}
-      />
+      <motion.div variants={fadeInUp} transition={gentle} className="w-full flex justify-center">
+        <EarningsFeed
+          totalEarnings={data.totalEarnings}
+          transactions={data.transactions}
+        />
+      </motion.div>
 
       {/* Domain tags */}
       {data.domains.length > 0 && (
-        <div className="flex flex-wrap gap-2 justify-center">
-          {data.domains.map((d) => (
-            <span
+        <motion.div
+          className="flex flex-wrap gap-2 justify-center"
+          variants={fadeInUp}
+          transition={gentle}
+        >
+          {data.domains.map((d, i) => (
+            <motion.div
               key={d}
-              className="px-3 py-1 rounded-full bg-[var(--accent-bg)] text-[var(--accent)] text-xs font-medium"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 + i * 0.05, ...gentle }}
             >
-              {d}
-            </span>
+              <Badge variant="secondary">{d}</Badge>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }

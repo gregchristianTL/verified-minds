@@ -1,5 +1,7 @@
 "use client";
 
+import { motion } from "framer-motion";
+
 interface ProgressBarProps {
   progress: number;
   itemCount: number;
@@ -30,24 +32,25 @@ export default function ProgressBar({
 
   return (
     <div className="w-72 space-y-2.5">
-      {/* Phase label */}
-      <p className="text-center text-sm font-medium text-[var(--foreground)]">
+      <p className="text-center text-sm font-medium text-foreground">
         {getPhaseLabel(clamped)}
       </p>
 
-      {/* Bar */}
-      <div className="h-2 w-full rounded-full bg-[var(--border)] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-1000 ease-out"
-          style={{
+      <div className="h-2 w-full rounded-full bg-border overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          initial={{ width: 0 }}
+          animate={{
             width: `${clamped}%`,
-            backgroundColor: isDone ? "var(--success)" : "var(--accent)",
+            backgroundColor: isDone
+              ? "var(--vm-success)"
+              : "var(--vm-accent)",
           }}
+          transition={{ duration: 1, ease: "easeOut" }}
         />
       </div>
 
-      {/* Count */}
-      <p className="text-center text-xs text-[var(--muted)]">
+      <p className="text-center text-xs text-muted-foreground">
         {itemCount > 0
           ? `${itemCount} insight${itemCount !== 1 ? "s" : ""} captured`
           : "Listening..."}

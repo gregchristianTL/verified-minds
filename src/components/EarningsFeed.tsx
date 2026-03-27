@@ -1,5 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { fadeInUp, staggerContainer, gentle } from "@/lib/motion";
+
 interface Transaction {
   id: string;
   querySummary: string | null;
@@ -25,6 +32,42 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
+/** Animated counter that counts up to the target value */
+function AnimatedCounter({ value }: { value: number }): React.ReactElement {
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
+
+  useEffect(() => {
+    const start = prevRef.current;
+    const diff = value - start;
+    if (Math.abs(diff) < 0.01) {
+      setDisplay(value);
+      return;
+    }
+
+    const duration = 800;
+    const startTime = Date.now();
+
+    function tick(): void {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(start + diff * eased);
+
+      if (progress < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        prevRef.current = value;
+      }
+    }
+
+    requestAnimationFrame(tick);
+  }, [value]);
+
+  return <>${display.toFixed(2)}</>;
+}
+
 export default function EarningsFeed({
   totalEarnings,
   transactions,
@@ -32,59 +75,77 @@ export default function EarningsFeed({
   const total = parseFloat(totalEarnings || "0");
 
   return (
-    <div className="w-full max-w-sm space-y-8">
+    <motion.div
+      className="w-full max-w-sm space-y-8"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
       {/* Hero earnings card */}
-      <div className="text-center p-8 rounded-3xl bg-[var(--card)] shadow-[var(--shadow-md)]">
-        <p className="text-5xl font-bold tracking-tight text-[var(--foreground)]">
-          ${total.toFixed(2)}
-        </p>
-        <p className="text-[var(--muted)] text-sm mt-2">total earned</p>
-      </div>
+      <motion.div variants={fadeInUp} transition={gentle}>
+        <Card className="shadow-lg border-0">
+          <CardContent className="text-center py-8 px-8">
+            <p className="text-5xl font-bold tracking-tight text-foreground">
+              <AnimatedCounter value={total} />
+            </p>
+            <p className="text-muted-foreground text-sm mt-2">total earned</p>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Transactions */}
-      <div>
-        <p className="text-xs font-medium text-[var(--muted)] uppercase tracking-wider mb-3 px-1">
+      <motion.div variants={fadeInUp} transition={gentle}>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 px-1">
           Recent activity
         </p>
-        <div className="rounded-2xl bg-[var(--card)] shadow-[var(--shadow)] overflow-hidden divide-y divide-[var(--border)]">
-          {transactions.length === 0 ? (
-            <div className="px-4 py-10 text-center">
-              <p className="text-[var(--muted)] text-sm">
-                No queries yet — sit back and relax.
-              </p>
-              <p className="text-[var(--muted-light)] text-xs mt-1">
-                You&apos;ll see earnings here as they come in.
-              </p>
-            </div>
-          ) : (
-            transactions.map((tx) => (
-              <div
-                key={tx.id}
-                className="flex items-center justify-between px-4 py-3.5"
-              >
-                <div className="flex-1 min-w-0 mr-3">
-                  <p className="text-sm text-[var(--foreground)] truncate">
-                    {tx.querySummary ?? "Query"}
-                  </p>
-                  {tx.domainTag && (
-                    <p className="text-xs text-[var(--muted-light)] mt-0.5">
-                      {tx.domainTag}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="text-[var(--success)] text-sm font-semibold">
-                    +${tx.amount.toFixed(2)}
-                  </span>
-                  <span className="text-[var(--muted-light)] text-xs">
-                    {timeAgo(tx.createdAt)}
-                  </span>
-                </div>
+        <Card>
+          <CardContent className="p-0">
+            {transactions.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <p className="text-muted-foreground text-sm">
+                  No queries yet — sit back and relax.
+                </p>
+                <p className="text-muted-foreground/60 text-xs mt-1">
+                  You&apos;ll see earnings here as they come in.
+                </p>
               </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+            ) : (
+              <div>
+                {transactions.map((tx, i) => (
+                  <motion.div
+                    key={tx.id}
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 + i * 0.05, ...gentle }}
+                  >
+                    {i > 0 && <Separator />}
+                    <div className="flex items-center justify-between px-4 py-3.5">
+                      <div className="flex-1 min-w-0 mr-3">
+                        <p className="text-sm text-foreground truncate">
+                          {tx.querySummary ?? "Query"}
+                        </p>
+                        {tx.domainTag && (
+                          <Badge variant="secondary" className="mt-1 text-[10px] h-5">
+                            {tx.domainTag}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-vm-success text-sm font-semibold">
+                          +${tx.amount.toFixed(2)}
+                        </span>
+                        <span className="text-muted-foreground/60 text-xs">
+                          {timeAgo(tx.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 }
