@@ -2,9 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { gentle } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { Send, MessageSquare } from "lucide-react";
@@ -87,8 +84,8 @@ export default function ExpertQuery({
             <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
               <MessageSquare className="size-5 text-primary" />
             </div>
-            <p className="text-foreground font-medium">Ask anything</p>
-            <p className="text-muted-foreground text-sm mt-1">
+            <p className="text-white font-medium">Ask anything</p>
+            <p className="text-white/50 text-sm mt-1">
               This expert&apos;s knowledge is ready for your questions.
             </p>
           </motion.div>
@@ -113,7 +110,7 @@ export default function ExpertQuery({
                 className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground rounded-br-md"
-                    : "bg-card shadow-sm border text-card-foreground rounded-bl-md"
+                    : "backdrop-blur-lg bg-white/5 border border-white/10 text-white/90 rounded-bl-md"
                 }`}
               >
                 {msg.content}
@@ -132,50 +129,54 @@ export default function ExpertQuery({
               exit={{ opacity: 0, x: -20 }}
               transition={gentle}
             >
-              <Card className="w-fit">
-                <CardContent className="px-4 py-3">
-                  <div className="flex gap-1.5">
-                    {[0, 1, 2].map((dot) => (
-                      <motion.div
-                        key={dot}
-                        className="w-2 h-2 rounded-full bg-primary/40"
-                        animate={{ y: [0, -6, 0] }}
-                        transition={{
-                          duration: 0.6,
-                          repeat: Infinity,
-                          delay: dot * 0.15,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="backdrop-blur-lg bg-white/5 border border-white/10 rounded-2xl rounded-bl-md px-4 py-3 w-fit">
+                <div className="flex gap-1.5">
+                  {[0, 1, 2].map((dot) => (
+                    <motion.div
+                      key={dot}
+                      className="w-2 h-2 rounded-full bg-primary/40"
+                      animate={{ y: [0, -6, 0] }}
+                      transition={{
+                        duration: 0.6,
+                        repeat: Infinity,
+                        delay: dot * 0.15,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* Input */}
-      <div className="pt-4 mt-2 border-t border-border">
+      <div className="pt-4 mt-2 border-t border-white/10">
         <div className="flex gap-2">
-          <Input
+          <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Ask a question..."
-            className="flex-1 rounded-xl h-11"
+            className="flex-1 h-11 rounded-xl px-4 text-sm text-white placeholder:text-white/30
+                       backdrop-blur-lg bg-white/5 border border-white/10
+                       focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50
+                       transition-all"
           />
-          <Button
+          <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            size="icon"
-            className="rounded-xl h-11 w-11 shrink-0"
+            className="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl
+                       bg-primary text-primary-foreground
+                       hover:shadow-[0_0_20px_rgba(232,104,48,0.3)]
+                       transition-all active:scale-[0.97]
+                       disabled:opacity-40 disabled:pointer-events-none"
           >
             <Send className="size-4" />
-          </Button>
+          </button>
         </div>
       </div>
     </div>

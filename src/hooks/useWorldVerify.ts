@@ -80,6 +80,10 @@ export function useWorldVerify(): UseWorldVerifyReturn {
 
       sessionStorage.setItem("profileId", data.profileId);
       sessionStorage.setItem("userId", data.userId);
+      sessionStorage.setItem(
+        "knowledgeItemCount",
+        String(data.knowledgeItemCount ?? 0),
+      );
       if (data.walletAddress) {
         sessionStorage.setItem("walletAddress", data.walletAddress);
       }

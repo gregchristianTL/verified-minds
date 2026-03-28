@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 
 interface ExpertCardProps {
@@ -16,14 +14,14 @@ interface ExpertCardProps {
 }
 
 const AVATAR_COLORS = [
-  "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400",
-  "bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400",
-  "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
-  "bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400",
-  "bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400",
-  "bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400",
-  "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400",
-  "bg-teal-100 text-teal-600 dark:bg-teal-900/40 dark:text-teal-400",
+  "bg-amber-900/40 text-amber-400",
+  "bg-orange-900/40 text-orange-400",
+  "bg-emerald-900/40 text-emerald-400",
+  "bg-rose-900/40 text-rose-400",
+  "bg-sky-900/40 text-sky-400",
+  "bg-violet-900/40 text-violet-400",
+  "bg-red-900/40 text-red-400",
+  "bg-teal-900/40 text-teal-400",
 ];
 
 function nameColor(name: string): string {
@@ -54,36 +52,37 @@ export default function ExpertCard({
         whileHover={{ y: -2, transition: { duration: 0.2 } }}
         whileTap={{ scale: 0.98 }}
         onHoverStart={() => play("hover")}
+        className="backdrop-blur-lg bg-white/5 border border-white/10 rounded-2xl p-4
+                   hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer
+                   flex items-center gap-4"
       >
-        <Card className="hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="flex items-center gap-4 p-4">
-            <Avatar className={`w-11 h-11 ${nameColor(displayName)}`}>
-              <AvatarFallback className={nameColor(displayName)}>
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+        <Avatar className={`w-11 h-11 ${nameColor(displayName)}`}>
+          <AvatarFallback className={nameColor(displayName)}>
+            {initials}
+          </AvatarFallback>
+        </Avatar>
 
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-foreground">{displayName}</p>
-              {bio && (
-                <p className="text-muted-foreground text-sm line-clamp-1 mt-0.5">
-                  {bio}
-                </p>
-              )}
-              <div className="flex gap-1.5 flex-wrap mt-1.5">
-                {domains.map((d) => (
-                  <Badge key={d} variant="secondary" className="text-[10px] h-5">
-                    {d}
-                  </Badge>
-                ))}
-              </div>
-            </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-white">{displayName}</p>
+          {bio && (
+            <p className="text-white/50 text-sm line-clamp-1 mt-0.5">{bio}</p>
+          )}
+          <div className="flex gap-1.5 flex-wrap mt-1.5">
+            {domains.map((d) => (
+              <span
+                key={d}
+                className="text-[10px] h-5 inline-flex items-center px-2 rounded-full
+                           bg-white/10 text-white/60 font-mono"
+              >
+                {d}
+              </span>
+            ))}
+          </div>
+        </div>
 
-            <span className="font-mono text-muted-foreground text-sm whitespace-nowrap font-medium">
-              ${parseFloat(queryPrice).toFixed(2)}
-            </span>
-          </CardContent>
-        </Card>
+        <span className="font-mono text-white/40 text-sm whitespace-nowrap font-medium">
+          ${parseFloat(queryPrice).toFixed(2)}
+        </span>
       </motion.div>
     </Link>
   );

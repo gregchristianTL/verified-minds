@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import ExpertCard from "@/components/ExpertCard";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { staggerContainer, fadeInUp, gentle } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { Loader2 } from "lucide-react";
@@ -47,31 +45,38 @@ export default function MarketplacePage(): React.ReactElement {
       animate="animate"
     >
       <motion.div className="text-center space-y-2" variants={fadeInUp} transition={gentle}>
-        <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
+        <h1
+          className="font-heading text-3xl font-bold tracking-tight text-white"
+          style={{ textShadow: "0 2px 20px rgba(0,0,0,0.5)" }}
+        >
           Ask a Real Expert
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p
+          className="text-white/60 text-sm"
+          style={{ textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}
+        >
           Real humans, verified by World ID. Their knowledge, your questions.
         </p>
       </motion.div>
 
       {experts.length === 0 ? (
         <motion.div variants={fadeInUp} transition={gentle}>
-          <Card className="text-center">
-            <CardContent className="py-16 px-6">
-              <p className="text-foreground font-medium">No experts yet</p>
-              <p className="text-muted-foreground text-sm mt-1">
-                Be the first to share your expertise.
-              </p>
-              <Link
-                href="/"
-                className={buttonVariants({ className: "mt-4" })}
-                onClick={() => play("click")}
-              >
-                Become an expert
-              </Link>
-            </CardContent>
-          </Card>
+          <div className="text-center backdrop-blur-lg bg-white/5 border border-white/10 rounded-2xl py-16 px-6">
+            <p className="text-white font-medium">No experts yet</p>
+            <p className="text-white/50 text-sm mt-1">
+              Be the first to share your expertise.
+            </p>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center h-10 px-5 mt-4 rounded-2xl
+                         bg-primary text-primary-foreground font-heading font-medium text-sm
+                         shadow-lg hover:shadow-[0_0_30px_rgba(232,104,48,0.35)]
+                         transition-all active:scale-[0.97]"
+              onClick={() => play("click")}
+            >
+              Become an expert
+            </Link>
+          </div>
         </motion.div>
       ) : (
         <motion.div className="space-y-3" variants={staggerContainer}>
@@ -96,7 +101,7 @@ export default function MarketplacePage(): React.ReactElement {
       <motion.div className="text-center pt-2" variants={fadeInUp} transition={gentle}>
         <Link
           href="/"
-          className="text-muted-foreground text-sm hover:text-primary transition-colors"
+          className="text-white/40 text-sm hover:text-primary transition-colors"
           onClick={() => play("navigate")}
         >
           Want to become an expert?

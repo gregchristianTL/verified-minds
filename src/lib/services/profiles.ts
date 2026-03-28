@@ -12,6 +12,7 @@ export interface ProfileResult {
   userId: string;
   profileId: string;
   profileStatus: string | null;
+  knowledgeItemCount: number;
   isNew: boolean;
 }
 
@@ -36,6 +37,7 @@ export function findOrCreateProfile(input: CreateProfileInput): ProfileResult {
       userId: existing.id,
       profileId: profile?.id ?? "",
       profileStatus: profile?.status ?? null,
+      knowledgeItemCount: profile?.knowledgeItemCount ?? 0,
       isNew: false,
     };
   }
@@ -68,6 +70,7 @@ export function findOrCreateProfile(input: CreateProfileInput): ProfileResult {
     userId,
     profileId,
     profileStatus: "extracting",
+    knowledgeItemCount: 0,
     isNew: true,
   };
 }
