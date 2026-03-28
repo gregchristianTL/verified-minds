@@ -80,15 +80,19 @@ export function useWorldVerify(): UseWorldVerifyReturn {
 
       sessionStorage.setItem("profileId", data.profileId);
       sessionStorage.setItem("userId", data.userId);
+      sessionStorage.setItem(
+        "knowledgeItemCount",
+        String(data.knowledgeItemCount ?? 0),
+      );
       if (data.walletAddress) {
         sessionStorage.setItem("walletAddress", data.walletAddress);
       }
 
       play("success");
       if (data.profileStatus === "live") {
-        router.push("/expertise/done");
+        router.push("/done");
       } else {
-        router.push("/expertise/interview");
+        router.push("/interview");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");

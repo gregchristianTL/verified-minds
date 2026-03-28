@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import ExpertQuery from "@/components/ExpertQuery";
-import { buttonVariants } from "@/components/ui/button";
 import { fadeInUp, gentle } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { ChevronLeft } from "lucide-react";
@@ -23,17 +22,19 @@ export default function QueryExpertPage(): React.ReactElement {
       transition={gentle}
     >
       {/* Header */}
-      <div className="flex items-center gap-3 pb-4 mb-4 border-b border-border">
+      <div className="flex items-center gap-3 pb-4 mb-4 border-b border-white/10">
         <Link
-          href="/expertise/marketplace"
-          className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-full" })}
+          href="/marketplace"
+          className="inline-flex items-center justify-center size-9 rounded-full
+                     backdrop-blur-md bg-white/5 text-white/60 hover:text-white hover:bg-white/10
+                     transition-all active:scale-[0.97]"
           onClick={() => play("navigate")}
         >
           <ChevronLeft className="size-4" />
         </Link>
         <div>
-          <h1 className="font-medium text-foreground">Ask an Expert</h1>
-          <p className="text-xs text-muted-foreground">Powered by verified human knowledge</p>
+          <h1 className="font-medium text-white">Ask an Expert</h1>
+          <p className="text-xs text-white/50">Powered by verified human knowledge</p>
         </div>
       </div>
 

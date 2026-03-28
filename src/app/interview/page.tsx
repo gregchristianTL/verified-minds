@@ -27,6 +27,14 @@ interface RealtimeEvent {
   };
 }
 
+const TARGET_KNOWLEDGE_ITEMS = 15;
+const TOTAL_INTERVIEW_MINUTES = 15;
+
+function estimateMinutesRemaining(knowledgeCount: number): number {
+  const pct = Math.min(knowledgeCount / TARGET_KNOWLEDGE_ITEMS, 0.95);
+  return Math.max(2, Math.ceil(TOTAL_INTERVIEW_MINUTES * (1 - pct)));
+}
+
 export default function InterviewPage(): React.ReactElement {
   const router = useRouter();
   const { play } = useSoundSystem();
@@ -35,6 +43,8 @@ export default function InterviewPage(): React.ReactElement {
   const [isConnected, setIsConnected] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [knowledgeCount, setKnowledgeCount] = useState(0);
+  /** Knowledge items already in the DB when the page loaded (drives CTA & time estimate) */
+  const [initialKnowledgeCount, setInitialKnowledgeCount] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const [statusHint, setStatusHint] = useState("Tap to begin your interview");
@@ -55,7 +65,7 @@ export default function InterviewPage(): React.ReactElement {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number>(0);
 
-  // ── Bootstrap: load profileId, wallet, balance ──────────────────────
+  // ── Bootstrap: load profileId, wallet, balance, and prior progress ──
   useEffect(() => {
     profileIdRef.current = sessionStorage.getItem("profileId") ?? "";
     setUserIdentity(
@@ -64,15 +74,34 @@ export default function InterviewPage(): React.ReactElement {
         "",
     );
     if (!profileIdRef.current) {
-      router.push("/expertise");
+      router.push("/");
       return;
     }
 
-    fetch(`/api/expertise/earnings?profileId=${profileIdRef.current}`)
+    const pid = profileIdRef.current;
+
+    fetch(`/api/expertise/earnings?profileId=${pid}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.totalEarnings) {
           setBalance(parseFloat(data.totalEarnings).toFixed(2));
+        }
+      })
+      .catch(() => {});
+
+    // Fetch profile to seed returning-user state (CTA text, time estimate, progress bar)
+    fetch(`/api/expertise/profiles?profileId=${encodeURIComponent(pid)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return;
+        const count: number = data.knowledgeItemCount ?? 0;
+        setInitialKnowledgeCount(count);
+        if (count > 0) {
+          setKnowledgeCount(count);
+          setProgress(
+            Math.min((count / TARGET_KNOWLEDGE_ITEMS) * 100, 60),
+          );
+          setStatusHint("Welcome back — tap to pick up where you left off");
         }
       })
       .catch(() => {});
@@ -252,7 +281,7 @@ export default function InterviewPage(): React.ReactElement {
             setIsComplete(true);
             setProgress(100);
             play("success");
-            setTimeout(() => router.push("/expertise/done"), 3000);
+            setTimeout(() => router.push("/done"), 3000);
             break;
           }
           default:
@@ -401,22 +430,8 @@ export default function InterviewPage(): React.ReactElement {
         setStatusHint("ADIN is listening — just talk naturally");
       });
 
-      // Fetch existing progress for resume sessions
-      try {
-        const ctxRes = await fetch(
-          `/api/expertise/earnings?profileId=${profileId}`,
-        );
-        if (ctxRes.ok) {
-          const ctxData = await ctxRes.json();
-          const count = ctxData.transactions?.length ?? 0;
-          if (count > 0) {
-            setKnowledgeCount(count);
-            setProgress(Math.min(count * 5, 60));
-          }
-        }
-      } catch {
-        // Non-critical — just skip resume context on the UI side
-      }
+      // Resume progress is already seeded from the profile fetch on mount —
+      // no additional fetch needed here.
 
       setIsConnected(true);
       startAudioLevelLoop();
@@ -432,7 +447,7 @@ export default function InterviewPage(): React.ReactElement {
     play("click");
     teardown();
     setIsConnected(false);
-    router.push("/expertise/done");
+    router.push("/done");
   }
 
   function teardown(): void {
@@ -534,6 +549,22 @@ export default function InterviewPage(): React.ReactElement {
           {statusHint}
         </motion.p>
 
+        {/* Time estimate pill — shown before the session starts */}
+        {!isConnected && (
+          <motion.span
+            className="inline-block rounded-full bg-white/5 border border-white/10
+                       px-3 py-1 font-mono text-xs text-white/50"
+            variants={fadeInUp}
+            initial="initial"
+            animate="animate"
+            transition={{ ...gentle, delay: 0.25 }}
+          >
+            {initialKnowledgeCount > 0
+              ? `~${estimateMinutesRemaining(initialKnowledgeCount)} min remaining`
+              : `~${TOTAL_INTERVIEW_MINUTES} min`}
+          </motion.span>
+        )}
+
         <motion.div
           variants={fadeInUp}
           initial="initial"
@@ -555,7 +586,9 @@ export default function InterviewPage(): React.ReactElement {
                   className="py-6 px-8 rounded-2xl text-base shadow-lg hover:shadow-xl
                              transition-shadow active:scale-[0.97]"
                 >
-                  Start Interview
+                  {initialKnowledgeCount > 0
+                    ? "Continue Interview"
+                    : "Start Interview"}
                 </Button>
               </motion.div>
             ) : (
@@ -619,7 +652,9 @@ export default function InterviewPage(): React.ReactElement {
               {
                 step: "01",
                 title: "Talk",
-                desc: "ADIN interviews you about your expertise. ~15 min, just a conversation.",
+                desc: initialKnowledgeCount > 0
+                  ? `Pick up where you left off. ~${estimateMinutesRemaining(initialKnowledgeCount)} min to go.`
+                  : "ADIN interviews you about your expertise. ~15 min, just a conversation.",
               },
               {
                 step: "02",

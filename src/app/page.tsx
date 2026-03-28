@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import VideoBackground from "@/components/VideoBackground";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -8,8 +10,43 @@ import { useWorldVerify } from "@/hooks/useWorldVerify";
 import { staggerContainer, fadeInUp, scaleIn, gentle } from "@/lib/motion";
 import { Loader2, AlertCircle } from "lucide-react";
 
+type ReturningState =
+  | { kind: "loading" }
+  | { kind: "new" }
+  | { kind: "not_started"; profileId: string }
+  | { kind: "in_progress"; profileId: string }
+  | { kind: "live"; profileId: string };
+
 export default function MarketingPage(): React.ReactElement {
+  const router = useRouter();
   const { verify, verifying, error } = useWorldVerify();
+  const [returningState, setReturningState] = useState<ReturningState>({ kind: "loading" });
+
+  // Detect returning users who still have a valid session
+  useEffect(() => {
+    const profileId = sessionStorage.getItem("profileId");
+    if (!profileId) {
+      setReturningState({ kind: "new" });
+      return;
+    }
+
+    fetch(`/api/expertise/profiles?profileId=${encodeURIComponent(profileId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) {
+          setReturningState({ kind: "new" });
+          return;
+        }
+        if (data.status === "live") {
+          setReturningState({ kind: "live", profileId });
+        } else if ((data.knowledgeItemCount ?? 0) > 0) {
+          setReturningState({ kind: "in_progress", profileId });
+        } else {
+          setReturningState({ kind: "not_started", profileId });
+        }
+      })
+      .catch(() => setReturningState({ kind: "new" }));
+  }, []);
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
@@ -53,29 +90,49 @@ export default function MarketingPage(): React.ReactElement {
           transition={gentle}
         >
           <button
-            onClick={verify}
-            disabled={verifying}
+            onClick={() => {
+              switch (returningState.kind) {
+                case "in_progress":
+                case "not_started":
+                  router.push("/interview");
+                  break;
+                case "live":
+                  router.push("/done");
+                  break;
+                default:
+                  verify();
+              }
+            }}
+            disabled={verifying || returningState.kind === "loading"}
             className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-2xl
                        bg-primary text-primary-foreground font-heading font-medium text-base
                        shadow-lg hover:shadow-[0_0_30px_rgba(232,104,48,0.35)]
-                       transition-all active:scale-[0.97] disabled:opacity-50"
+                       transition-all active:scale-[0.97] disabled:opacity-50 cursor-pointer"
           >
             {verifying ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="size-4 animate-spin" />
                 Verifying...
               </span>
+            ) : returningState.kind === "loading" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : returningState.kind === "in_progress" ? (
+              "Continue Interview"
+            ) : returningState.kind === "not_started" ? (
+              "Start Interview"
+            ) : returningState.kind === "live" ? (
+              "View My Agent"
             ) : (
               "Create My Agent"
             )}
           </button>
           <Link
-            href="/expertise/marketplace"
+            href="/marketplace"
             className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-2xl
                        border border-white/20 text-white/90 font-heading font-medium text-base
                        backdrop-blur-md bg-white/5
                        hover:bg-white/10 hover:border-white/30
-                       transition-all active:scale-[0.97]"
+                       transition-all active:scale-[0.97] cursor-pointer"
           >
             Browse Agents
           </Link>
