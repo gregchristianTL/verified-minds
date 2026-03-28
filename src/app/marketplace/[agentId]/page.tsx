@@ -25,7 +25,7 @@ export default function QueryExpertPage(): React.ReactElement {
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 mb-4 border-b border-border">
         <Link
-          href="/expertise/marketplace"
+          href="/marketplace"
           className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-full" })}
           onClick={() => play("navigate")}
         >

@@ -207,7 +207,7 @@ function InterviewIncomplete({
         <Button
           onClick={() => {
             play("click");
-            router.push("/expertise/interview");
+            router.push("/interview");
           }}
           size="lg"
           className="w-full py-6 rounded-2xl text-base font-heading font-medium shadow-lg
@@ -217,7 +217,7 @@ function InterviewIncomplete({
         </Button>
 
         <Link
-          href="/expertise/marketplace"
+          href="/marketplace"
           className="block text-white/40 text-sm hover:text-primary transition-colors"
           onClick={() => play("navigate")}
         >
@@ -289,7 +289,7 @@ function AgentLive({
       {/* Browse marketplace link */}
       <motion.div variants={fadeInUp} transition={gentle}>
         <Link
-          href="/expertise/marketplace"
+          href="/marketplace"
           className="text-white/40 text-sm hover:text-primary transition-colors font-mono"
           onClick={() => play("navigate")}
         >

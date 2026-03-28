@@ -1,14 +1,23 @@
 /**
- * ADIN v1 API Client
+ * ADIN Engine Client
  *
- * Calls the deployed adin-chat instance for:
- * - Creating custom agents (expert sub-agents)
- * - Querying expert agents via chat (with delegation)
- * - Listing agents on the marketplace
+ * Local engine interface — replaces the previous HTTP client that called
+ * an external adin-chat instance. All operations now run in-process against
+ * the embedded engine, SQLite DB, and AI SDK.
  */
 
-const ADIN_API_URL = process.env.ADIN_API_URL ?? "http://localhost:3001";
-const ADIN_WALLET = process.env.ADIN_WALLET_ADDRESS ?? "";
+import type { ModelMessage } from "ai";
+
+import { chat } from "./engine";
+import {
+  createCustomAgent as dbCreateAgent,
+} from "./custom-agents";
+import { getCustomAgentDefinitions } from "./custom-agents";
+import { getAgentsList } from "./agents";
+
+// ---------------------------------------------------------------------------
+// Create an expert agent (stored locally)
+// ---------------------------------------------------------------------------
 
 interface CreateAgentParams {
   agentId: string;
@@ -19,62 +28,88 @@ interface CreateAgentParams {
   modelTier?: "fast" | "balanced" | "power" | "max";
 }
 
+export async function createExpertAgent(
+  params: CreateAgentParams,
+): Promise<{ agentId: string }> {
+  const tier = params.modelTier === "max" ? "power" : (params.modelTier ?? "balanced");
+
+  const result = await dbCreateAgent({
+    agentId: params.agentId,
+    name: params.name,
+    description: params.description,
+    systemPrompt: params.systemPrompt,
+    tools: params.tools,
+    modelTier: tier,
+    createdBy: "api",
+  });
+
+  if ("error" in result) {
+    throw new Error(result.error);
+  }
+
+  return { agentId: result.agent.id };
+}
+
+// ---------------------------------------------------------------------------
+// Query an expert agent via the chat engine
+// ---------------------------------------------------------------------------
+
 interface ChatParams {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   conversationId?: string;
   stream?: boolean;
-}
-
-interface AdinAgent {
-  agentId: string;
-  name: string;
-  description: string;
-  tools: string[];
-  modelTier: string;
-}
-
-async function adinFetch<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const res = await fetch(`${ADIN_API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "x-payer-address": ADIN_WALLET,
-      ...options.headers,
-    },
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`ADIN API error ${res.status}: ${text}`);
-  }
-
-  return res.json() as Promise<T>;
-}
-
-export async function createExpertAgent(
-  params: CreateAgentParams,
-): Promise<{ agentId: string }> {
-  return adinFetch("/api/v1/agents", {
-    method: "POST",
-    body: JSON.stringify(params),
-  });
+  userId?: string;
 }
 
 export async function queryExpertAgent(
   params: ChatParams,
 ): Promise<{ text: string; conversationId: string }> {
-  return adinFetch("/api/v1/chat", {
-    method: "POST",
-    body: JSON.stringify({
-      ...params,
-      stream: false,
-    }),
+  // Convert simple messages to ModelMessage format
+  const modelMessages: ModelMessage[] = params.messages.map((m) => ({
+    role: m.role,
+    content: [{ type: "text" as const, text: m.content }],
+  }));
+
+  const response = await chat({
+    messages: modelMessages,
+    conversationId: params.conversationId,
+    stream: false,
+    userId: params.userId,
   });
+
+  return {
+    text: response.message.content,
+    conversationId: response.id,
+  };
 }
 
-export async function listAgents(): Promise<{ agents: AdinAgent[] }> {
-  return adinFetch("/api/v1/agents");
+// ---------------------------------------------------------------------------
+// List all agents (static + custom)
+// ---------------------------------------------------------------------------
+
+interface AdinAgent {
+  agentId: string;
+  name: string;
+  description: string;
+  icon: string;
+  isCustom: boolean;
 }
+
+export async function listAgents(userId?: string): Promise<{ agents: AdinAgent[] }> {
+  const customDefs = getCustomAgentDefinitions(userId);
+  const list = getAgentsList(customDefs);
+
+  return {
+    agents: list.map((a) => ({
+      agentId: a.id,
+      name: a.name,
+      description: a.description,
+      icon: a.icon,
+      isCustom: a.isCustom,
+    })),
+  };
+}
+
+// Re-export engine for direct use
+export { chat, chatStream } from "./engine";
+export type { ChatRequest, ChatResponse } from "./types";

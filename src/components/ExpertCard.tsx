@@ -49,7 +49,7 @@ export default function ExpertCard({
     .toUpperCase();
 
   return (
-    <Link href={`/expertise/marketplace/${id}`} onClick={() => play("click")}>
+    <Link href={`/marketplace/${id}`} onClick={() => play("click")}>
       <motion.div
         whileHover={{ y: -2, transition: { duration: 0.2 } }}
         whileTap={{ scale: 0.98 }}

@@ -86,9 +86,9 @@ export function useWorldVerify(): UseWorldVerifyReturn {
 
       play("success");
       if (data.profileStatus === "live") {
-        router.push("/expertise/done");
+        router.push("/done");
       } else {
-        router.push("/expertise/interview");
+        router.push("/interview");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");

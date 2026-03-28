@@ -5,7 +5,7 @@ import { createExpertAgent } from "@/lib/adin/client";
  * Agent Factory
  *
  * Generates a rich system prompt from extracted knowledge items
- * and creates the custom agent in ADIN.
+ * and creates the custom agent via the local ADIN engine.
  */
 
 function generateSystemPrompt(
@@ -81,7 +81,7 @@ export async function buildAndPublishAgent(params: {
     name: `${params.displayName}'s Expertise`,
     description: params.bio,
     systemPrompt,
-    tools: ["search_web", "fetch_url", "memory", "confidence"],
+    tools: ["search_web", "fetch_url", "memory_save", "memory_recall"],
     modelTier: "balanced",
   });
 

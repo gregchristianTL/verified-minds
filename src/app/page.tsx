@@ -58,7 +58,7 @@ export default function MarketingPage(): React.ReactElement {
             className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-2xl
                        bg-primary text-primary-foreground font-heading font-medium text-base
                        shadow-lg hover:shadow-[0_0_30px_rgba(232,104,48,0.35)]
-                       transition-all active:scale-[0.97] disabled:opacity-50"
+                       transition-all active:scale-[0.97] disabled:opacity-50 cursor-pointer"
           >
             {verifying ? (
               <span className="flex items-center gap-2">
@@ -70,12 +70,12 @@ export default function MarketingPage(): React.ReactElement {
             )}
           </button>
           <Link
-            href="/expertise/marketplace"
+            href="/marketplace"
             className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-2xl
                        border border-white/20 text-white/90 font-heading font-medium text-base
                        backdrop-blur-md bg-white/5
                        hover:bg-white/10 hover:border-white/30
-                       transition-all active:scale-[0.97]"
+                       transition-all active:scale-[0.97] cursor-pointer"
           >
             Browse Agents
           </Link>

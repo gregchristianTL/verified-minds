@@ -64,7 +64,7 @@ export default function InterviewPage(): React.ReactElement {
         "",
     );
     if (!profileIdRef.current) {
-      router.push("/expertise");
+      router.push("/");
       return;
     }
 
@@ -252,7 +252,7 @@ export default function InterviewPage(): React.ReactElement {
             setIsComplete(true);
             setProgress(100);
             play("success");
-            setTimeout(() => router.push("/expertise/done"), 3000);
+            setTimeout(() => router.push("/done"), 3000);
             break;
           }
           default:
@@ -432,7 +432,7 @@ export default function InterviewPage(): React.ReactElement {
     play("click");
     teardown();
     setIsConnected(false);
-    router.push("/expertise/done");
+    router.push("/done");
   }
 
   function teardown(): void {
