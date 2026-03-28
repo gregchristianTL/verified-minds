@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { fadeInUp, staggerContainer, gentle } from "@/lib/motion";
+import { useSoundSystem } from "@/hooks/useSoundSystem";
 
 interface Transaction {
   id: string;
@@ -73,6 +74,16 @@ export default function EarningsFeed({
   transactions,
 }: EarningsFeedProps): React.ReactElement {
   const total = parseFloat(totalEarnings || "0");
+  const { play } = useSoundSystem();
+  const prevTxCountRef = useRef(transactions.length);
+
+  // Play cha-ching when new transactions arrive (skip initial render)
+  useEffect(() => {
+    if (transactions.length > prevTxCountRef.current) {
+      play("chaChing");
+    }
+    prevTxCountRef.current = transactions.length;
+  }, [transactions.length, play]);
 
   return (
     <motion.div

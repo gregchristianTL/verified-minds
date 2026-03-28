@@ -8,6 +8,7 @@ export const SOUND_MAP = {
   send: "/sounds/send.mp3",
   receive: "/sounds/receive.mp3",
   toggle: "/sounds/toggle.mp3",
+  chaChing: "/sounds/chaching.wav",
 } as const;
 
 export type SoundName = keyof typeof SOUND_MAP;
@@ -22,4 +23,5 @@ export const SOUND_VOLUMES: Record<SoundName, number> = {
   send: 0.2,
   receive: 0.15,
   toggle: 0.2,
+  chaChing: 0.5,
 };
