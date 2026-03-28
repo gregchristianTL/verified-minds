@@ -61,7 +61,7 @@ export default function MarketplacePage(): React.ReactElement {
 
       {experts.length === 0 ? (
         <motion.div variants={fadeInUp} transition={gentle}>
-          <div className="text-center backdrop-blur-lg bg-white/5 border border-white/10 rounded-2xl py-16 px-6">
+          <div className="text-center backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl py-16 px-6">
             <p className="text-white font-medium">No experts yet</p>
             <p className="text-white/50 text-sm mt-1">
               Be the first to share your expertise.

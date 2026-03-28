@@ -52,8 +52,8 @@ export default function ExpertCard({
         whileHover={{ y: -2, transition: { duration: 0.2 } }}
         whileTap={{ scale: 0.98 }}
         onHoverStart={() => play("hover")}
-        className="backdrop-blur-lg bg-white/5 border border-white/10 rounded-2xl p-4
-                   hover:bg-white/[0.08] hover:border-white/20 transition-all cursor-pointer
+        className="backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl p-4
+                   hover:bg-black/70 hover:border-white/20 transition-all cursor-pointer
                    flex items-center gap-4"
       >
         <Avatar className={`w-11 h-11 ${nameColor(displayName)}`}>
@@ -72,7 +72,7 @@ export default function ExpertCard({
               <span
                 key={d}
                 className="text-[10px] h-5 inline-flex items-center px-2 rounded-full
-                           bg-white/10 text-white/60 font-mono"
+                           bg-white/[0.12] text-white/80 font-mono"
               >
                 {d}
               </span>
