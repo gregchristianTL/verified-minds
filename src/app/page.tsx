@@ -11,31 +11,41 @@ import { staggerContainer, fadeInUp, scaleIn, gentle } from "@/lib/motion";
 import { Loader2, AlertCircle } from "lucide-react";
 
 type ReturningState =
+  | { kind: "loading" }
   | { kind: "new" }
+  | { kind: "not_started"; profileId: string }
   | { kind: "in_progress"; profileId: string }
   | { kind: "live"; profileId: string };
 
 export default function MarketingPage(): React.ReactElement {
   const router = useRouter();
   const { verify, verifying, error } = useWorldVerify();
-  const [returningState, setReturningState] = useState<ReturningState>({ kind: "new" });
+  const [returningState, setReturningState] = useState<ReturningState>({ kind: "loading" });
 
   // Detect returning users who still have a valid session
   useEffect(() => {
     const profileId = sessionStorage.getItem("profileId");
-    if (!profileId) return;
+    if (!profileId) {
+      setReturningState({ kind: "new" });
+      return;
+    }
 
     fetch(`/api/expertise/profiles?profileId=${encodeURIComponent(profileId)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data) return;
+        if (!data) {
+          setReturningState({ kind: "new" });
+          return;
+        }
         if (data.status === "live") {
           setReturningState({ kind: "live", profileId });
         } else if ((data.knowledgeItemCount ?? 0) > 0) {
           setReturningState({ kind: "in_progress", profileId });
+        } else {
+          setReturningState({ kind: "not_started", profileId });
         }
       })
-      .catch(() => {});
+      .catch(() => setReturningState({ kind: "new" }));
   }, []);
 
   return (
@@ -81,15 +91,19 @@ export default function MarketingPage(): React.ReactElement {
         >
           <button
             onClick={() => {
-              if (returningState.kind === "in_progress") {
-                router.push("/interview");
-              } else if (returningState.kind === "live") {
-                router.push("/done");
-              } else {
-                verify();
+              switch (returningState.kind) {
+                case "in_progress":
+                case "not_started":
+                  router.push("/interview");
+                  break;
+                case "live":
+                  router.push("/done");
+                  break;
+                default:
+                  verify();
               }
             }}
-            disabled={verifying}
+            disabled={verifying || returningState.kind === "loading"}
             className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-2xl
                        bg-primary text-primary-foreground font-heading font-medium text-base
                        shadow-lg hover:shadow-[0_0_30px_rgba(232,104,48,0.35)]
@@ -100,8 +114,12 @@ export default function MarketingPage(): React.ReactElement {
                 <Loader2 className="size-4 animate-spin" />
                 Verifying...
               </span>
+            ) : returningState.kind === "loading" ? (
+              <Loader2 className="size-4 animate-spin" />
             ) : returningState.kind === "in_progress" ? (
               "Continue Interview"
+            ) : returningState.kind === "not_started" ? (
+              "Start Interview"
             ) : returningState.kind === "live" ? (
               "View My Agent"
             ) : (
