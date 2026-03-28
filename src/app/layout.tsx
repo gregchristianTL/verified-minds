@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { SoundProvider } from "@/providers/SoundProvider";
 import "./globals.css";
@@ -28,6 +29,7 @@ export default function RootLayout({
             {children}
           </SoundProvider>
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
