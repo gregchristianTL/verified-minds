@@ -107,13 +107,10 @@ export function withX402(
         isInitialized = true;
       } catch (error) {
         initPromise = null;
-        if (error instanceof FacilitatorResponseError) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: 502 },
-          );
-        }
-        throw error;
+        const message =
+          error instanceof Error ? error.message : "Payment facilitator unavailable";
+        const status = error instanceof FacilitatorResponseError ? 502 : 503;
+        return NextResponse.json({ error: message }, { status });
       }
     }
 

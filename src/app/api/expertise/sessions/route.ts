@@ -22,17 +22,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "profileId required" }, { status: 400 });
   }
 
-  const sessions = getSessionsForProfile(profileId);
+  try {
+    const sessions = getSessionsForProfile(profileId);
 
-  return NextResponse.json({
-    sessions: sessions.map((s) => ({
-      id: s.id,
-      realtimeSessionId: s.realtimeSessionId,
-      durationSeconds: s.durationSeconds,
-      knowledgeItemsAdded: s.knowledgeItemsAdded,
-      domainsCovered: JSON.parse(s.domainsCovered ?? "[]"),
-      sessionSummary: s.sessionSummary,
-      createdAt: s.createdAt,
-    })),
-  });
+    return NextResponse.json({
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        realtimeSessionId: s.realtimeSessionId,
+        durationSeconds: s.durationSeconds,
+        knowledgeItemsAdded: s.knowledgeItemsAdded,
+        domainsCovered: JSON.parse(s.domainsCovered ?? "[]"),
+        sessionSummary: s.sessionSummary,
+        createdAt: s.createdAt,
+      })),
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch sessions";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
