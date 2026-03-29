@@ -1,10 +1,17 @@
-import type { AgentDefinition, ToolContext } from "./types";
+import type { AgentDefinition } from "./types";
 
 /**
  * Build the orchestrator system prompt.
  *
  * This is the "brain" prompt sent to the top-level model that decides
  * whether to answer directly or delegate to a specialist agent.
+ * @param context
+ * @param context.userId
+ * @param context.persistentMemories
+ * @param context.currentRequest
+ * @param context.stepBudget
+ * @param context.maxSteps
+ * @param context.customAgents
  */
 export function buildSystemPrompt(context: {
   userId: string;
@@ -74,6 +81,9 @@ ${memoriesSection}${agentsSection}
  *
  * This wraps the agent's custom system prompt with delegation context
  * so the agent knows it's handling a specific task, not a free conversation.
+ * @param agentDef
+ * @param task
+ * @param taskContext
  */
 export function buildDelegationPrompt(
   agentDef: AgentDefinition,
@@ -98,6 +108,8 @@ Do not ask follow-up questions — provide the best answer you can with what you
 
 /**
  * Build the delegate tool description dynamically based on available agents.
+ * @param customAgents
+ * @param staticAgents
  */
 export function buildDelegateDescription(
   customAgents: Record<string, AgentDefinition>,

@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { agentMemory } from "@/lib/db/schema";
@@ -9,6 +9,9 @@ import type { MemoryEntry, MemoryScope } from "./types";
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 interface SaveMemoryParams {
   userId: string;
   conversationId?: string | null;
@@ -24,8 +27,15 @@ interface SaveMemoryParams {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 type MemoryRow = typeof agentMemory.$inferSelect;
 
+/**
+ *
+ * @param row
+ */
 function toMemoryEntry(row: MemoryRow): MemoryEntry {
   return {
     id: row.id,
@@ -44,12 +54,15 @@ function toMemoryEntry(row: MemoryRow): MemoryEntry {
 // CRUD
 // ---------------------------------------------------------------------------
 
-/** Upsert a memory entry — if key+scope+user+conversation exists, update content */
-export function saveMemory(params: SaveMemoryParams): MemoryEntry {
+/**
+ * Upsert a memory entry — if key+scope+user+conversation exists, update content
+ * @param params
+ */
+export async function saveMemory(params: SaveMemoryParams): Promise<MemoryEntry> {
   const now = new Date().toISOString();
   const conversationId = params.conversationId ?? null;
 
-  const existing = db
+  const existing = await db
     .select()
     .from(agentMemory)
     .where(
@@ -62,11 +75,11 @@ export function saveMemory(params: SaveMemoryParams): MemoryEntry {
           : isNull(agentMemory.conversationId),
       ),
     )
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (existing.length > 0) {
-    db.update(agentMemory)
+    await db
+      .update(agentMemory)
       .set({
         content: params.content,
         reason: params.reason ?? existing[0].reason,
@@ -74,8 +87,7 @@ export function saveMemory(params: SaveMemoryParams): MemoryEntry {
         category: params.category ?? existing[0].category,
         updatedAt: now,
       })
-      .where(eq(agentMemory.id, existing[0].id))
-      .run();
+      .where(eq(agentMemory.id, existing[0].id));
 
     return toMemoryEntry({ ...existing[0], content: params.content, updatedAt: now });
   }
@@ -98,15 +110,18 @@ export function saveMemory(params: SaveMemoryParams): MemoryEntry {
     updatedAt: now,
   };
 
-  db.insert(agentMemory).values(row).run();
+  await db.insert(agentMemory).values(row);
   return toMemoryEntry(row);
 }
 
-/** Retrieve all persistent memories for a user */
-export function getPersistentMemories(
+/**
+ * Retrieve all persistent memories for a user
+ * @param userId
+ */
+export async function getPersistentMemories(
   userId: string,
-): Array<{ key: string; content: string }> {
-  const rows = db
+): Promise<Array<{ key: string; content: string }>> {
+  return db
     .select({ key: agentMemory.key, content: agentMemory.content })
     .from(agentMemory)
     .where(
@@ -114,17 +129,18 @@ export function getPersistentMemories(
         eq(agentMemory.userId, userId),
         eq(agentMemory.scope, "persistent"),
       ),
-    )
-    .all();
-
-  return rows;
+    );
 }
 
-/** Retrieve working memories for a specific conversation */
-export function getWorkingMemories(
+/**
+ * Retrieve working memories for a specific conversation
+ * @param userId
+ * @param conversationId
+ */
+export async function getWorkingMemories(
   userId: string,
   conversationId: string,
-): Array<{ key: string; content: string }> {
+): Promise<Array<{ key: string; content: string }>> {
   return db
     .select({ key: agentMemory.key, content: agentMemory.content })
     .from(agentMemory)
@@ -134,17 +150,21 @@ export function getWorkingMemories(
         eq(agentMemory.conversationId, conversationId),
         eq(agentMemory.scope, "working"),
       ),
-    )
-    .all();
+    );
 }
 
-/** Delete a specific memory by key */
-export function forgetMemory(
+/**
+ * Delete a specific memory by key
+ * @param userId
+ * @param key
+ * @param scope
+ */
+export async function forgetMemory(
   userId: string,
   key: string,
   scope: MemoryScope = "persistent",
-): boolean {
-  const result = db
+): Promise<boolean> {
+  const deleted = await db
     .delete(agentMemory)
     .where(
       and(
@@ -153,7 +173,7 @@ export function forgetMemory(
         eq(agentMemory.key, key),
       ),
     )
-    .run();
+    .returning({ id: agentMemory.id });
 
-  return result.changes > 0;
+  return deleted.length > 0;
 }

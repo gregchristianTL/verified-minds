@@ -1,10 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
+import Link from "next/link";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 
+/**
+ *
+ */
 interface ExpertCardProps {
   id: string;
   displayName: string;
@@ -24,12 +28,25 @@ const AVATAR_COLORS = [
   "bg-teal-900/40 text-teal-400",
 ];
 
+/**
+ *
+ * @param name
+ */
 function nameColor(name: string): string {
   let hash = 0;
   for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.id
+ * @param root0.displayName
+ * @param root0.bio
+ * @param root0.domains
+ * @param root0.queryPrice
+ */
 export default function ExpertCard({
   id,
   displayName,

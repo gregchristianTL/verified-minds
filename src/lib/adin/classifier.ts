@@ -19,6 +19,10 @@ const COMPLEXITY_PATTERNS: Array<{ pattern: RegExp; complexity: TaskComplexity }
   { pattern: /\b(how|explain|describe|tell me about)\b/i, complexity: "moderate" },
 ];
 
+/**
+ *
+ * @param message
+ */
 function classifyRegex(message: string): TaskComplexity {
   const trimmed = message.trim();
   if (trimmed.length < 10) return "trivial";
@@ -52,6 +56,10 @@ const classificationSchema = z.object({
 
 const CLASSIFY_TIMEOUT_MS = 3000;
 
+/**
+ *
+ * @param message
+ */
 async function classifyLLM(message: string): Promise<TaskComplexity | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CLASSIFY_TIMEOUT_MS);
@@ -86,6 +94,11 @@ ${message.slice(0, 1000)}`,
 // Merged classifier — LLM with regex fallback
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ * @param a
+ * @param b
+ */
 function mergeComplexity(a: TaskComplexity, b: TaskComplexity): TaskComplexity {
   const order: TaskComplexity[] = [
     "trivial", "simple", "moderate", "complex", "extensive", "reasoning", "code",
@@ -95,6 +108,10 @@ function mergeComplexity(a: TaskComplexity, b: TaskComplexity): TaskComplexity {
   return order[Math.max(ai, bi)];
 }
 
+/**
+ *
+ * @param lastMessage
+ */
 export async function classifyTask(lastMessage: string): Promise<TaskBudget> {
   const regexComplexity = classifyRegex(lastMessage);
 

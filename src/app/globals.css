@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -56,6 +55,7 @@
   --vm-shadow: 0 1px 3px rgba(140, 80, 20, 0.06), 0 1px 2px rgba(140, 80, 20, 0.04);
   --vm-shadow-md: 0 4px 12px rgba(140, 80, 20, 0.08), 0 1px 3px rgba(140, 80, 20, 0.05);
   --vm-glow: 0 0 20px rgba(232, 104, 48, 0.2);
+  --vm-amber: #D97706;
 }
 
 .dark {
@@ -104,10 +104,41 @@
   --vm-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.15);
   --vm-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
   --vm-glow: 0 0 20px rgba(240, 160, 96, 0.25);
+  --vm-amber: #FBBF24;
+
+  /* Swarm UI semantic tokens -- volcanic dark palette */
+  --surface-primary:   oklch(0.08 0.02 50);
+  --surface-secondary: oklch(0.14 0.02 50);
+  --surface-elevated:  oklch(0.12 0.02 50);
+  --surface-overlay:   oklch(0.05 0.02 50 / 0.5);
+  --text-primary:      oklch(0.95 0.008 65);
+  --text-secondary:    oklch(0.70 0.012 60);
+  --text-tertiary:     oklch(0.55 0.015 55);
+  --text-inverse:      oklch(0.10 0.01 50);
+  --border-default:    oklch(0.24 0.025 50);
+  --border-subtle:     oklch(0.18 0.018 50);
+  --border-strong:     oklch(0.35 0.030 50);
+  --accent-primary:        oklch(0.68 0.18 55);
+  --accent-primary-hover:  oklch(0.72 0.20 55);
+  --accent-primary-text:   oklch(0.08 0.02 50);
+  --accent-secondary:      oklch(0.72 0.12 25);
+  --status-connected:    oklch(0.60 0.15 160);
+  --status-reconnecting: oklch(0.75 0.14 75);
+  --status-disconnected: oklch(0.62 0.20 25);
+  --node-intent:    oklch(0.68 0.18 55);
+  --node-promise:   oklch(0.62 0.12 160);
+  --node-complete:  oklch(0.68 0.14 85);
+  --node-fulfilled: oklch(0.65 0.12 95);
+  --node-decline:   oklch(0.62 0.14 25);
+  --scrollbar-thumb:       oklch(0.30 0.025 50);
+  --scrollbar-thumb-hover: oklch(0.40 0.030 50);
+  --selection-bg:   oklch(0.70 0.16 55 / 38%);
+  --selection-text: inherit;
+  --focus-ring:     oklch(0.68 0.18 55 / 45%);
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -148,9 +179,9 @@ body {
 }
 
 @theme inline {
-  --font-heading: 'JetBrains Mono', monospace;
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -197,6 +228,140 @@ body {
   --color-vm-success-bg: var(--vm-success-bg);
   --color-vm-muted: var(--vm-muted);
   --color-vm-muted-light: var(--vm-muted-light);
+  --color-vm-amber: var(--vm-amber);
+
+  /* Swarm UI semantic tokens for Tailwind classes */
+  --color-surface-primary:   var(--surface-primary);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-elevated:  var(--surface-elevated);
+  --color-surface-overlay:   var(--surface-overlay);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary:  var(--text-tertiary);
+  --color-text-inverse:   var(--text-inverse);
+  --color-border-default: var(--border-default);
+  --color-border-subtle:  var(--border-subtle);
+  --color-border-strong:  var(--border-strong);
+  --color-accent-primary:       var(--accent-primary);
+  --color-accent-primary-hover: var(--accent-primary-hover);
+  --color-accent-primary-text:  var(--accent-primary-text);
+  --color-accent-secondary:     var(--accent-secondary);
+  --color-status-connected:    var(--status-connected);
+  --color-status-reconnecting: var(--status-reconnecting);
+  --color-status-disconnected: var(--status-disconnected);
+  --color-node-intent:    var(--node-intent);
+  --color-node-promise:   var(--node-promise);
+  --color-node-complete:  var(--node-complete);
+  --color-node-fulfilled: var(--node-fulfilled);
+  --color-node-decline:   var(--node-decline);
+}
+
+/* ============ Swarm UI animations ============ */
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@utility animate-fadeSlideIn {
+  animation: fadeSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-dotPulse {
+  animation: dotPulse 1.5s ease-in-out infinite;
+}
+
+/* ============ Swarm scrollbar utilities ============ */
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar { width: 5px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+.scrollbar-hidden { scrollbar-width: none; }
+.scrollbar-hidden::-webkit-scrollbar { display: none; }
+
+/* ============ Swarm Three.js canvas ============ */
+
+.three-canvas canvas { outline: none; }
+
+/** CSS2D node labels (IntentTree) */
+.node-label {
+  max-width: 160px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background: color-mix(in oklch, var(--node-label-accent, oklch(0.68 0.18 55)) 14%, var(--color-surface-elevated));
+  border: 1px solid color-mix(in oklch, var(--node-label-accent, oklch(0.68 0.18 55)) 28%, var(--color-border-default));
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.06);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  pointer-events: auto;
+  transform-origin: center bottom;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease;
+}
+.node-label:hover {
+  transform: scale(1.04);
+  background: color-mix(in oklch, var(--node-label-accent, oklch(0.68 0.18 55)) 22%, var(--color-surface-elevated));
+  border-color: color-mix(in oklch, var(--node-label-accent, oklch(0.68 0.18 55)) 42%, var(--color-border-default));
+}
+.node-label.agent-label {
+  max-width: 280px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: pre-line;
+  text-overflow: clip;
+}
+
+/** Stacked agent activity notifications */
+.agent-toast {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--color-surface-elevated) 96%, transparent);
+  border: 1px solid var(--color-border-default);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/** Drag-to-resize handle on the left edge of the output pane */
+.output-pane-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  z-index: 1;
+}
+.output-pane-handle:hover {
+  background: color-mix(in oklch, var(--color-accent-primary) 22%, transparent);
+}
+
+.gradient-mask-top {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 24px);
 }
 
 @layer base {

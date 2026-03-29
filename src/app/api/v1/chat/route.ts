@@ -1,15 +1,14 @@
+import type { ModelMessage } from "ai";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import type { ModelMessage } from "ai";
 
 import { chat, chatStream } from "@/lib/adin/client";
+import { requireApiKey } from "@/lib/auth/apiKey";
+import { logger } from "@/lib/logger";
+import { apiError, apiErrorFromCatch,apiSuccess } from "@/lib/utils/apiResponse";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-// ---------------------------------------------------------------------------
-// POST /api/v1/chat — chat with the ADIN engine
-// ---------------------------------------------------------------------------
 
 const ChatRequestSchema = z.object({
   messages: z
@@ -25,7 +24,10 @@ const ChatRequestSchema = z.object({
   userId: z.string().optional(),
 });
 
-/** Convert simple { role, content } to ModelMessage format */
+/**
+ * Convert simple { role, content } to ModelMessage format
+ * @param messages
+ */
 function toModelMessages(
   messages: Array<{ role: "user" | "assistant"; content: string }>,
 ): ModelMessage[] {
@@ -35,16 +37,24 @@ function toModelMessages(
   }));
 }
 
+/**
+ * POST /api/v1/chat -- chat with the ADIN engine.
+ * Requires API key authentication via Authorization header.
+ * @param req
+ */
 export async function POST(req: NextRequest): Promise<NextResponse | Response> {
+  const authError = requireApiKey(req);
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const parsed = ChatRequestSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten() },
-        { status: 400 },
-      );
+      return apiError("Validation failed", 400, {
+        errorCode: "VALIDATION_ERROR",
+        details: parsed.error.flatten(),
+      });
     }
 
     const { messages, conversationId, stream, userId } = parsed.data;
@@ -70,10 +80,11 @@ export async function POST(req: NextRequest): Promise<NextResponse | Response> {
       userId: resolvedUserId,
     });
 
-    return NextResponse.json({ data: response });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[api/v1/chat] Error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiSuccess(response);
+  } catch (error: unknown) {
+    logger.error("v1/chat error", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return apiErrorFromCatch(error);
   }
 }

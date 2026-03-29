@@ -1,10 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
-import VideoBackground from "@/components/VideoBackground";
-import { staggerContainer, fadeInUp, gentle } from "@/lib/motion";
+import Link from "next/link";
 
+import VideoBackground from "@/components/VideoBackground";
+import { fadeInUp, gentle,staggerContainer } from "@/lib/motion";
+
+/**
+ *
+ */
 export default function NotFound(): React.ReactElement {
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">

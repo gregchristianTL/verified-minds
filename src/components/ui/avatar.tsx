@@ -1,10 +1,16 @@
 "use client"
 
-import * as React from "react"
 import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ * @param root0.size
+ */
 function Avatar({
   className,
   size = "default",
@@ -25,6 +31,11 @@ function Avatar({
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
   return (
     <AvatarPrimitive.Image
@@ -38,6 +49,11 @@ function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function AvatarFallback({
   className,
   ...props
@@ -54,6 +70,11 @@ function AvatarFallback({
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -70,6 +91,11 @@ function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -83,6 +109,11 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function AvatarGroupCount({
   className,
   ...props
@@ -101,9 +132,9 @@ function AvatarGroupCount({
 
 export {
   Avatar,
-  AvatarImage,
+  AvatarBadge,
   AvatarFallback,
   AvatarGroup,
   AvatarGroupCount,
-  AvatarBadge,
+  AvatarImage,
 }

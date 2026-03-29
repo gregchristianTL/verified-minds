@@ -1,20 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { knowledgeItems, expertProfiles } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
+import { isSession,requireSession } from "@/lib/auth/session";
+import { db } from "@/lib/db";
+import { expertProfiles,knowledgeItems } from "@/lib/db/schema";
+import { apiError,apiSuccess } from "@/lib/utils/apiResponse";
+
+const SaveKnowledgeSchema = z.object({
+  profileId: z.string().uuid(),
+  domain: z.string().min(1),
+  topic: z.string().min(1),
+  content: z.string().min(1),
+  phase: z.string().min(1),
+  sessionId: z.string().uuid().optional(),
+});
+
+/**
+ * POST /api/expertise/tools/save-knowledge
+ *
+ * Saves a knowledge item extracted during interview.
+ * Requires session; profileId must match the authenticated user.
+ * @param req
+ */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const { profileId, domain, topic, content, phase, sessionId } = body;
+  const session = await requireSession(req);
+  if (!isSession(session)) return session;
 
-  if (!profileId || !domain || !topic || !content || !phase) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return apiError("Invalid JSON", 400, { errorCode: "INVALID_JSON" });
+  }
+
+  const parsed = SaveKnowledgeSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return apiError("Invalid request", 400, {
+      errorCode: "VALIDATION_ERROR",
+      details: parsed.error.issues,
+    });
+  }
+
+  const { profileId, domain, topic, content, phase, sessionId } = parsed.data;
+
+  if (profileId !== session.profileId) {
+    return apiError("Forbidden", 403);
   }
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(knowledgeItems).values({
+  await db.insert(knowledgeItems).values({
     id,
     profileId,
     sessionId: sessionId ?? null,
@@ -23,13 +60,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     content,
     phase,
     createdAt: now,
-  }).run();
+  });
 
-  // Increment knowledge count on profile
-  db.update(expertProfiles)
-    .set({ knowledgeItemCount: sql`${expertProfiles.knowledgeItemCount} + 1` })
-    .where(eq(expertProfiles.id, profileId))
-    .run();
+  await db
+    .update(expertProfiles)
+    .set({
+      knowledgeItemCount: sql`${expertProfiles.knowledgeItemCount} + 1`,
+    })
+    .where(eq(expertProfiles.id, profileId));
 
-  return NextResponse.json({ id, saved: true });
+  return apiSuccess({ id, saved: true });
 }

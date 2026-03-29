@@ -4,6 +4,12 @@ import { Separator as SeparatorPrimitive } from "@base-ui/react/separator"
 
 import { cn } from "@/lib/utils"
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ * @param root0.orientation
+ */
 function Separator({
   className,
   orientation = "horizontal",

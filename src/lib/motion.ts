@@ -1,15 +1,21 @@
-import type { Variants, Transition } from "framer-motion";
+import type { Transition,Variants } from "framer-motion";
 
 /* ------------------------------------------------------------------ */
 /*  Reduced motion — returns static values when user prefers less      */
 /* ------------------------------------------------------------------ */
 
+/**
+ *
+ */
 function prefersReducedMotion(): boolean {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Wraps variants to return identity transforms when reduced motion is on */
+/**
+ * Wraps variants to return identity transforms when reduced motion is on
+ * @param v
+ */
 export function safeVariants(v: Variants): Variants {
   if (prefersReducedMotion()) {
     const safe: Variants = {};

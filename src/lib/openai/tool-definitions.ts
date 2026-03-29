@@ -5,6 +5,9 @@
  * during voice interviews. Passed via session.tools in the SDP handshake.
  */
 
+/**
+ *
+ */
 export interface RealtimeToolDefinition {
   type: "function";
   name: string;
@@ -37,14 +40,7 @@ export const PROFILER_TOOLS: RealtimeToolDefinition[] = [
         },
         phase: {
           type: "string",
-          enum: [
-            "domain_id",
-            "boundaries",
-            "unique_signal",
-            "decision_frameworks",
-            "persona",
-            "verification",
-          ],
+          enum: ["intro_domain", "unique_signal", "wrap"],
           description: "Which extraction phase this knowledge came from",
         },
       },
@@ -78,14 +74,7 @@ export const PROFILER_TOOLS: RealtimeToolDefinition[] = [
         },
         phase_completed: {
           type: "string",
-          enum: [
-            "domain_id",
-            "boundaries",
-            "unique_signal",
-            "decision_frameworks",
-            "persona",
-            "verification",
-          ],
+          enum: ["intro_domain", "unique_signal", "wrap"],
           description: "Which phase was just completed (if any)",
         },
       },
@@ -116,7 +105,7 @@ export const PROFILER_TOOLS: RealtimeToolDefinition[] = [
     type: "function",
     name: "create_agent",
     description:
-      "Create the expert's AI sub-agent. Call ONLY when phases 1-3 are complete (domain ID, boundaries, unique signal).",
+      "Create the expert's AI agent. Call when phases 1-2 are complete (intro/domain and unique signal). Provide a name, domains, and bio.",
     parameters: {
       type: "object",
       properties: {

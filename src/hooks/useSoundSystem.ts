@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useEffect } from "react";
 import { Howl } from "howler";
+import { useCallback, useEffect,useRef } from "react";
+
 import { SOUND_MAP, SOUND_VOLUMES, type SoundName } from "@/lib/sounds";
 import { useSoundStore } from "@/providers/SoundProvider";
 

@@ -2,6 +2,9 @@
 
 import { create } from "zustand";
 
+/**
+ *
+ */
 interface SoundState {
   isMuted: boolean;
   toggleMute: () => void;
@@ -16,6 +19,9 @@ export const useSoundStore = create<SoundState>((set) => ({
   isMuted: typeof window !== "undefined"
     ? localStorage.getItem("vm-sound-muted") === "true"
     : false,
+  /**
+   *
+   */
   toggleMute: () =>
     set((state) => {
       const next = !state.isMuted;
@@ -30,6 +36,8 @@ export const useSoundStore = create<SoundState>((set) => ({
  * Thin wrapper that just renders children — the actual state lives
  * in the zustand store above. This component exists so the root
  * layout reads clearly (ThemeProvider + SoundProvider).
+ * @param root0
+ * @param root0.children
  */
 export function SoundProvider({
   children,

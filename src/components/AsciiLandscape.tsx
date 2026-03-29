@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo,useRef } from "react";
 
+/**
+ *
+ */
 interface AsciiLandscapeProps {
   audioLevel: number;
   isActive: boolean;
@@ -18,6 +21,7 @@ const DEFAULT_SKY = [".", ",", "'", ":", "`", "-"];
 /**
  * Splits an identity string (e.g. wallet address or nullifier hash) into
  * character buckets for the four terrain density levels.
+ * @param id
  */
 function charsFromIdentity(id: string): {
   dense: string[];
@@ -49,10 +53,28 @@ const COLOR_PEAK = { r: 232, g: 184, b: 48 };
 const COLOR_SKY = { r: 45, g: 24, b: 16 };
 const COLOR_COMPLETE = { r: 34, g: 197, b: 94 };
 
+/**
+ *
+ * @param a
+ * @param b
+ * @param t
+ */
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ *
+ * @param c1
+ * @param c1.r
+ * @param c1.g
+ * @param c1.b
+ * @param c2
+ * @param c2.r
+ * @param c2.g
+ * @param c2.b
+ * @param t
+ */
 function lerpColor(
   c1: { r: number; g: number; b: number },
   c2: { r: number; g: number; b: number },
@@ -67,6 +89,10 @@ function lerpColor(
 /**
  * Layered sine-wave terrain. Returns a value 0..1 representing
  * "ground height" at a given column, modulated by time and audio.
+ * @param col
+ * @param cols
+ * @param time
+ * @param audio
  */
 function terrain(col: number, cols: number, time: number, audio: number): number {
   const x = col / cols;
@@ -87,6 +113,14 @@ function terrain(col: number, cols: number, time: number, audio: number): number
   return Math.max(0.15, Math.min(1, base + breath + audioWave));
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.audioLevel
+ * @param root0.isActive
+ * @param root0.isComplete
+ * @param root0.identity
+ */
 export default function AsciiLandscape({
   audioLevel,
   isActive,
@@ -234,6 +268,9 @@ export default function AsciiLandscape({
 
   /* Resize handler */
   useEffect(() => {
+    /**
+     *
+     */
     function handleResize(): void {
       const canvas = canvasRef.current;
       if (!canvas) return;

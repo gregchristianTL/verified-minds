@@ -1,5 +1,5 @@
-import { eq, and, desc } from "drizzle-orm";
 import type { ModelMessage } from "ai";
+import { and, desc,eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { adinConversations } from "@/lib/db/schema";
@@ -8,6 +8,9 @@ import { adinConversations } from "@/lib/db/schema";
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export interface Conversation {
   id: string;
   userId: string;
@@ -19,6 +22,9 @@ export interface Conversation {
   createdAt: string;
 }
 
+/**
+ *
+ */
 interface SaveConversationParams {
   userId: string;
   conversationId: string;
@@ -31,13 +37,17 @@ interface SaveConversationParams {
 // CRUD
 // ---------------------------------------------------------------------------
 
-export function saveConversation(params: SaveConversationParams): Conversation {
+/**
+ *
+ * @param params
+ */
+export async function saveConversation(params: SaveConversationParams): Promise<Conversation> {
   const now = new Date().toISOString();
   const messagesJson = JSON.stringify(params.messages);
   const messageCount = params.messages.length;
   const metadataJson = JSON.stringify(params.metadata || {});
 
-  const existing = db
+  const existing = await db
     .select({ id: adinConversations.id })
     .from(adinConversations)
     .where(
@@ -46,11 +56,11 @@ export function saveConversation(params: SaveConversationParams): Conversation {
         eq(adinConversations.userId, params.userId),
       ),
     )
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (existing.length > 0) {
-    db.update(adinConversations)
+    await db
+      .update(adinConversations)
       .set({
         messages: messagesJson,
         messageCount,
@@ -59,22 +69,19 @@ export function saveConversation(params: SaveConversationParams): Conversation {
         lastMessageAt: now,
         updatedAt: now,
       })
-      .where(eq(adinConversations.id, params.conversationId))
-      .run();
+      .where(eq(adinConversations.id, params.conversationId));
   } else {
-    db.insert(adinConversations)
-      .values({
-        id: params.conversationId,
-        userId: params.userId,
-        messages: messagesJson,
-        messageCount,
-        title: params.title ?? null,
-        metadata: metadataJson,
-        lastMessageAt: now,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(adinConversations).values({
+      id: params.conversationId,
+      userId: params.userId,
+      messages: messagesJson,
+      messageCount,
+      title: params.title ?? null,
+      metadata: metadataJson,
+      lastMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   return {
@@ -89,11 +96,16 @@ export function saveConversation(params: SaveConversationParams): Conversation {
   };
 }
 
-export function getConversation(
+/**
+ *
+ * @param conversationId
+ * @param userId
+ */
+export async function getConversation(
   conversationId: string,
   userId: string,
-): Conversation | null {
-  const [row] = db
+): Promise<Conversation | null> {
+  const [row] = await db
     .select()
     .from(adinConversations)
     .where(
@@ -102,8 +114,7 @@ export function getConversation(
         eq(adinConversations.userId, userId),
       ),
     )
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (!row) return null;
 
@@ -119,12 +130,18 @@ export function getConversation(
   };
 }
 
-export function listConversations(
+/**
+ *
+ * @param userId
+ * @param limit
+ * @param offset
+ */
+export async function listConversations(
   userId: string,
   limit = 50,
   offset = 0,
-): Array<Omit<Conversation, "messages">> {
-  const rows = db
+): Promise<Array<Omit<Conversation, "messages">>> {
+  const rows = await db
     .select({
       id: adinConversations.id,
       userId: adinConversations.userId,
@@ -138,8 +155,7 @@ export function listConversations(
     .where(eq(adinConversations.userId, userId))
     .orderBy(desc(adinConversations.lastMessageAt))
     .limit(limit)
-    .offset(offset)
-    .all();
+    .offset(offset);
 
   return rows.map((r) => ({
     id: r.id,

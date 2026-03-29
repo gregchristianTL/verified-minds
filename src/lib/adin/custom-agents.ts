@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { customAgents } from "@/lib/db/schema";
@@ -9,6 +9,9 @@ import type { AgentDefinition, ModelTier } from "./types";
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export interface CreateCustomAgentInput {
   userId?: string | null;
   agentId: string;
@@ -22,6 +25,9 @@ export interface CreateCustomAgentInput {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ *
+ */
 type CustomAgentRow = typeof customAgents.$inferSelect;
 
 // ---------------------------------------------------------------------------
@@ -30,6 +36,10 @@ type CustomAgentRow = typeof customAgents.$inferSelect;
 
 const VALID_TIERS = new Set(["micro", "fast", "balanced", "power", "reasoning"]);
 
+/**
+ *
+ * @param raw
+ */
 function sanitizeAgentId(raw: string): string {
   return raw
     .toLowerCase()
@@ -39,6 +49,10 @@ function sanitizeAgentId(raw: string): string {
     .slice(0, 64);
 }
 
+/**
+ *
+ * @param row
+ */
 function toAgentDefinition(row: CustomAgentRow): AgentDefinition {
   const tools: string[] = JSON.parse(row.tools || "[]");
   return {
@@ -58,6 +72,10 @@ function toAgentDefinition(row: CustomAgentRow): AgentDefinition {
 // CRUD
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ * @param input
+ */
 export async function createCustomAgent(
   input: CreateCustomAgentInput,
 ): Promise<{ agent: AgentDefinition } | { error: string }> {
@@ -69,7 +87,7 @@ export async function createCustomAgent(
 
   const tier = input.modelTier && VALID_TIERS.has(input.modelTier) ? input.modelTier : "balanced";
 
-  const existing = db
+  const existing = await db
     .select({ id: customAgents.id })
     .from(customAgents)
     .where(
@@ -78,8 +96,7 @@ export async function createCustomAgent(
         input.userId ? eq(customAgents.userId, input.userId) : isNull(customAgents.userId),
       ),
     )
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (existing.length > 0) {
     return { error: `An agent with ID "${agentId}" already exists` };
@@ -88,23 +105,21 @@ export async function createCustomAgent(
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
 
-  db.insert(customAgents)
-    .values({
-      id,
-      userId: input.userId ?? null,
-      agentId,
-      name: input.name.trim(),
-      description: input.description.trim(),
-      icon: input.icon || "🤖",
-      systemPrompt: input.systemPrompt.trim(),
-      tools: JSON.stringify(input.tools || []),
-      modelTier: tier,
-      createdBy: input.createdBy || "orchestrator",
-      metadata: JSON.stringify(input.metadata || {}),
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(customAgents).values({
+    id,
+    userId: input.userId ?? null,
+    agentId,
+    name: input.name.trim(),
+    description: input.description.trim(),
+    icon: input.icon || "🤖",
+    systemPrompt: input.systemPrompt.trim(),
+    tools: JSON.stringify(input.tools || []),
+    modelTier: tier,
+    createdBy: input.createdBy || "orchestrator",
+    metadata: JSON.stringify(input.metadata || {}),
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return {
     agent: {
@@ -120,34 +135,34 @@ export async function createCustomAgent(
   };
 }
 
-export function getCustomAgents(userId?: string): AgentDefinition[] {
+/**
+ *
+ * @param userId
+ */
+export async function getCustomAgents(userId?: string): Promise<AgentDefinition[]> {
   const rows = userId
-    ? db
+    ? (
+        await db
+          .select()
+          .from(customAgents)
+          .where(eq(customAgents.isActive, true))
+      ).filter((r) => r.userId === userId || r.userId === null)
+    : await db
         .select()
         .from(customAgents)
-        .where(
-          and(
-            eq(customAgents.isActive, true),
-            // Return global agents + user-specific agents
-            // SQLite OR: just do two queries and merge
-          ),
-        )
-        .all()
-        .filter((r) => r.userId === userId || r.userId === null)
-    : db
-        .select()
-        .from(customAgents)
-        .where(and(eq(customAgents.isActive, true), isNull(customAgents.userId)))
-        .all();
+        .where(and(eq(customAgents.isActive, true), isNull(customAgents.userId)));
 
   return rows.map(toAgentDefinition);
 }
 
-/** Returns a map of agentId -> AgentDefinition for merging with static agents */
-export function getCustomAgentDefinitions(
+/**
+ * Returns a map of agentId -> AgentDefinition for merging with static agents
+ * @param userId
+ */
+export async function getCustomAgentDefinitions(
   userId?: string,
-): Record<string, AgentDefinition> {
-  const agents = getCustomAgents(userId);
+): Promise<Record<string, AgentDefinition>> {
+  const agents = await getCustomAgents(userId);
   const result: Record<string, AgentDefinition> = {};
   for (const agent of agents) {
     result[agent.id] = agent;
@@ -155,8 +170,13 @@ export function getCustomAgentDefinitions(
   return result;
 }
 
-export function deactivateCustomAgent(agentId: string, userId?: string): boolean {
-  const result = db
+/**
+ *
+ * @param agentId
+ * @param userId
+ */
+export async function deactivateCustomAgent(agentId: string, userId?: string): Promise<boolean> {
+  const updated = await db
     .update(customAgents)
     .set({ isActive: false, updatedAt: new Date().toISOString() })
     .where(
@@ -165,7 +185,7 @@ export function deactivateCustomAgent(agentId: string, userId?: string): boolean
         userId ? eq(customAgents.userId, userId) : isNull(customAgents.userId),
       ),
     )
-    .run();
+    .returning({ id: customAgents.id });
 
-  return result.changes > 0;
+  return updated.length > 0;
 }

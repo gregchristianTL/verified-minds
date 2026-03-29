@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { fadeInUp, staggerContainer, gentle } from "@/lib/motion";
-import { useSoundSystem } from "@/hooks/useSoundSystem";
+import { useEffect, useRef, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { useSoundSystem } from "@/hooks/useSoundSystem";
+import { fadeInUp, gentle,staggerContainer } from "@/lib/motion";
+
+/**
+ *
+ */
 interface Transaction {
   id: string;
   querySummary: string | null;
@@ -17,11 +21,18 @@ interface Transaction {
   createdAt: string;
 }
 
+/**
+ *
+ */
 interface EarningsFeedProps {
   totalEarnings: string;
   transactions: Transaction[];
 }
 
+/**
+ *
+ * @param dateStr
+ */
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor(
     (Date.now() - new Date(dateStr).getTime()) / 1000,
@@ -33,7 +44,11 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-/** Animated counter that counts up to the target value */
+/**
+ * Animated counter that counts up to the target value
+ * @param root0
+ * @param root0.value
+ */
 function AnimatedCounter({ value }: { value: number }): React.ReactElement {
   const [display, setDisplay] = useState(0);
   const prevRef = useRef(0);
@@ -49,6 +64,9 @@ function AnimatedCounter({ value }: { value: number }): React.ReactElement {
     const duration = 800;
     const startTime = Date.now();
 
+    /**
+     *
+     */
     function tick(): void {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
@@ -69,6 +87,12 @@ function AnimatedCounter({ value }: { value: number }): React.ReactElement {
   return <>{display.toFixed(2)} <span className="text-muted-foreground text-3xl">USDC</span></>;
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.totalEarnings
+ * @param root0.transactions
+ */
 export default function EarningsFeed({
   totalEarnings,
   transactions,

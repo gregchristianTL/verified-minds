@@ -8,6 +8,9 @@
 // NOTE: @xmtp/xmtp-js is deprecated but functional for the hackathon.
 // Production would use @xmtp/mls-client or @xmtp/browser-sdk.
 
+/**
+ *
+ */
 interface NotificationParams {
   walletAddress: string;
   amount: number;
@@ -15,6 +18,10 @@ interface NotificationParams {
   domainTag: string | null;
 }
 
+/**
+ *
+ * @param params
+ */
 export async function sendEarningsNotification(
   params: NotificationParams,
 ): Promise<boolean> {
@@ -53,8 +60,12 @@ export async function sendEarningsNotification(
 
     await conversation.send(message);
     return true;
-  } catch (error) {
-    console.error("[XMTP] Notification failed:", error);
+  } catch (error: unknown) {
+    const { logger } = await import("@/lib/logger");
+    logger.error("XMTP notification failed", {
+      error: error instanceof Error ? error.message : "unknown",
+      walletAddress: params.walletAddress,
+    });
     return false;
   }
 }

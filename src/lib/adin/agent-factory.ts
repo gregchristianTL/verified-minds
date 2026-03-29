@@ -1,5 +1,5 @@
-import type { KnowledgeItem, DomainConfidence } from "@/types";
 import { createExpertAgent } from "@/lib/adin/client";
+import type { DomainConfidence,KnowledgeItem } from "@/types";
 
 /**
  * Agent Factory
@@ -8,6 +8,14 @@ import { createExpertAgent } from "@/lib/adin/client";
  * and creates the custom agent via the local ADIN engine.
  */
 
+/**
+ *
+ * @param displayName
+ * @param bio
+ * @param domains
+ * @param items
+ * @param confidences
+ */
 function generateSystemPrompt(
   displayName: string,
   bio: string,
@@ -51,6 +59,10 @@ ${domainSections.join("\n\n")}
 - Never make up knowledge you don't have. It's better to say "I don't have a strong take on that" than to fabricate.`;
 }
 
+/**
+ *
+ * @param name
+ */
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -59,6 +71,15 @@ function slugify(name: string): string {
     .slice(0, 50);
 }
 
+/**
+ *
+ * @param params
+ * @param params.displayName
+ * @param params.bio
+ * @param params.domains
+ * @param params.knowledgeItems
+ * @param params.confidences
+ */
 export async function buildAndPublishAgent(params: {
   displayName: string;
   bio: string;

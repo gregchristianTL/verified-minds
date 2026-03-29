@@ -4,14 +4,11 @@ export type ProfileStatus = "extracting" | "live";
 /** Confidence level for a knowledge domain */
 export type ConfidenceLevel = "low" | "medium" | "high";
 
-/** Extraction checklist phase */
+/** Interview phases used during expertise extraction */
 export type ExtractionPhase =
-  | "domain_id"
-  | "boundaries"
+  | "intro_domain"
   | "unique_signal"
-  | "decision_frameworks"
-  | "persona"
-  | "verification";
+  | "wrap";
 
 /** A single extracted knowledge item stored during interview */
 export interface KnowledgeItem {

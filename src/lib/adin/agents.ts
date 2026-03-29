@@ -1,9 +1,9 @@
-import { generateText, stepCountIs, zodSchema, type ToolSet } from "ai";
+import { generateText, stepCountIs, type ToolSet,zodSchema } from "ai";
 import { z } from "zod";
 
+import { getCustomAgentDefinitions } from "./custom-agents";
 import { getModelForTier } from "./models";
 import { buildDelegationPrompt } from "./prompt";
-import { getCustomAgentDefinitions } from "./custom-agents";
 import type { AgentDefinition, DelegateResult, ToolContext } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +64,10 @@ When writing:
 // Agent registry helpers
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ * @param customAgentDefs
+ */
 export function getAgentsList(
   customAgentDefs: Record<string, AgentDefinition> = {},
 ): Array<{
@@ -116,6 +120,13 @@ export function getAgentsList(
 const DELEGATION_TIMEOUT_MS = 60_000;
 const MAX_DELEGATION_STEPS = 8;
 
+/**
+ *
+ * @param agentDef
+ * @param task
+ * @param context
+ * @param agentTools
+ */
 export async function runAgent(
   agentDef: AgentDefinition,
   task: string,
@@ -187,6 +198,13 @@ const delegateSchema = z.object({
     .describe("Relevant context, data, or previous findings to pass to the agent"),
 });
 
+/**
+ *
+ * @param toolContext
+ * @param agentTools
+ * @param customAgentDefs
+ * @param description
+ */
 export function createDelegateTool(
   toolContext: ToolContext,
   agentTools: ToolSet,
@@ -201,11 +219,15 @@ export function createDelegateTool(
   return {
     description,
     inputSchema: zodSchema(delegateSchema),
+    /**
+     *
+     * @param args
+     */
     execute: async (args: z.infer<typeof delegateSchema>) => {
       let agentDef = allAgents[args.agent];
 
       if (!agentDef) {
-        const fresh = getCustomAgentDefinitions(toolContext.userId);
+        const fresh = await getCustomAgentDefinitions(toolContext.userId);
         agentDef = fresh[args.agent];
         if (agentDef) allAgents[args.agent] = agentDef;
       }

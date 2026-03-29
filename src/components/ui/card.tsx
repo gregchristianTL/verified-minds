@@ -2,6 +2,12 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ * @param root0.size
+ */
 function Card({
   className,
   size = "default",
@@ -20,6 +26,11 @@ function Card({
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -33,6 +44,11 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -46,6 +62,11 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -56,6 +77,11 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -69,6 +95,11 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -79,6 +110,11 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ */
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -94,10 +130,10 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 export {
   Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
   CardAction,
-  CardDescription,
   CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
 }

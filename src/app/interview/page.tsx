@@ -1,24 +1,32 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Howl } from "howler";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import AsciiLandscape from "@/components/AsciiLandscape";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fadeInUp, gentle, scaleIn } from "@/lib/motion";
-import { useSoundSystem } from "@/hooks/useSoundSystem";
-import { useSoundStore } from "@/providers/SoundProvider";
-import { CheckCircle2, AlertTriangle, Mic } from "lucide-react";
 import BalanceSheet from "@/components/BalanceSheet";
-import ProgressBar from "@/components/ProgressBar";
+import ProgressBar, { INTERVIEW_PHASES } from "@/components/ProgressBar";
+import { useMicStatus } from "@/hooks/useMicStatus";
+import { useSoundSystem } from "@/hooks/useSoundSystem";
+import { gentle } from "@/lib/motion";
+import { useSoundStore } from "@/providers/SoundProvider";
+
+import BuildStageOverlay from "./BuildStageOverlay";
+import InterviewControls from "./InterviewControls";
+import InterviewFooter from "./InterviewFooter";
+import InterviewHeader from "./InterviewHeader";
+import { dispatchToolCall } from "./toolCallDispatch";
+import { useInterviewBootstrap } from "./useInterviewBootstrap";
+import { useRealtimeConnection } from "./useRealtimeConnection";
 
 /** Realtime API server event shape (subset we care about) */
 interface RealtimeEvent {
   type: string;
   transcript?: string;
   event_id?: string;
+  error?: { type: string; code?: string; message: string; param?: string };
   response?: {
     output?: {
       type: string;
@@ -29,217 +37,79 @@ interface RealtimeEvent {
   };
 }
 
-const TARGET_KNOWLEDGE_ITEMS = 15;
-const TOTAL_INTERVIEW_MINUTES = 15;
+const TARGET_KNOWLEDGE_ITEMS = 5;
+const TOTAL_INTERVIEW_MINUTES = 3;
 
+/**
+ * Estimate minutes left based on knowledge items extracted so far
+ * @param knowledgeCount
+ */
 function estimateMinutesRemaining(knowledgeCount: number): number {
   const pct = Math.min(knowledgeCount / TARGET_KNOWLEDGE_ITEMS, 0.95);
-  return Math.max(2, Math.ceil(TOTAL_INTERVIEW_MINUTES * (1 - pct)));
+  return Math.max(1, Math.ceil(TOTAL_INTERVIEW_MINUTES * (1 - pct)));
 }
 
+/**
+ * InterviewPage - Voice interview with ADIN via OpenAI Realtime API.
+ *
+ * Orchestrates the multi-phase interview flow. Heavy lifting is delegated to:
+ * - useInterviewBootstrap: profile/earnings/phase seeding
+ * - useRealtimeConnection: WebRTC lifecycle
+ * - dispatchToolCall: API tool call dispatch
+ */
+// eslint-disable-next-line max-lines-per-function -- page orchestrator; logic is in hooks/subcomponents
 export default function InterviewPage(): React.ReactElement {
   const router = useRouter();
   const { play } = useSoundSystem();
   const isMuted = useSoundStore((s) => s.isMuted);
+  const { micPermission, deviceMuted, showMicAlert } = useMicStatus();
+  const rtc = useRealtimeConnection();
+  const bs = useInterviewBootstrap(() => router.push("/"));
 
   const [isConnected, setIsConnected] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [knowledgeCount, setKnowledgeCount] = useState(0);
-  /** Knowledge items already in the DB when the page loaded (drives CTA & time estimate) */
-  const [initialKnowledgeCount, setInitialKnowledgeCount] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [statusHint, setStatusHint] = useState("Tap to begin your interview");
-  const [userIdentity, setUserIdentity] = useState<string>("");
-  const [balance, setBalance] = useState<string>("0.00");
-  const [micPermission, setMicPermission] = useState<
-    "granted" | "denied" | "prompt" | "unknown"
-  >("unknown");
-  const [deviceMuted, setDeviceMuted] = useState(false);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [buildStage, setBuildStage] = useState<
-    "analyzing" | "building" | "live" | null
+    "saving" | "analyzing" | "building" | "live" | null
   >(null);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<{
+    topic: string;
+    domain: string;
+  } | null>(null);
 
-  const profileIdRef = useRef<string>("");
-  const sessionIdRef = useRef<string>("");
-  const sessionStartRef = useRef<number>(0);
-  const transcriptRef = useRef<Array<{ role: string; text: string; ts: string }>>(
-    [],
-  );
-  const knowledgeCountRef = useRef<number>(0);
+  const transcriptRef = useRef<Array<{ role: string; text: string; ts: string }>>([]);
+  const knowledgeCountRef = useRef(0);
   const createAgentArgsRef = useRef<{
     name: string;
     args: string;
     callId: string;
   } | null>(null);
   const buildTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const lastSavedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedDomainsRef = useRef<Set<string>>(new Set());
   const ambientRef = useRef<Howl | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dcRef = useRef<RTCDataChannel | null>(null);
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animFrameRef = useRef<number>(0);
-
-  // ── Bootstrap: load profileId, wallet, balance, and prior progress ──
-  useEffect(() => {
-    profileIdRef.current = sessionStorage.getItem("profileId") ?? "";
-    setUserIdentity(
-      sessionStorage.getItem("walletAddress") ||
-        sessionStorage.getItem("userId") ||
-        "",
-    );
-    if (!profileIdRef.current) {
-      router.push("/");
-      return;
-    }
-
-    const pid = profileIdRef.current;
-
-    fetch(`/api/expertise/earnings?profileId=${pid}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.totalEarnings) {
-          setBalance(parseFloat(data.totalEarnings).toFixed(2));
-        }
-      })
-      .catch(() => {});
-
-    // Fetch profile to seed returning-user state (CTA text, time estimate, progress bar)
-    fetch(`/api/expertise/profiles?profileId=${encodeURIComponent(pid)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data) return;
-        const count: number = data.knowledgeItemCount ?? 0;
-        setInitialKnowledgeCount(count);
-        if (count > 0) {
-          setKnowledgeCount(count);
-          setProgress(
-            Math.min((count / TARGET_KNOWLEDGE_ITEMS) * 100, 60),
-          );
-          setStatusHint("Welcome back — tap to pick up where you left off");
-        }
-      })
-      .catch(() => {});
-  }, [router]);
-
-  // ── Microphone permission check ─────────────────────────────────────
-  useEffect(() => {
-    if (!navigator.permissions) {
-      setMicPermission("unknown");
-      return;
-    }
-    navigator.permissions
-      .query({ name: "microphone" as PermissionName })
-      .then((status) => {
-        setMicPermission(status.state as "granted" | "denied" | "prompt");
-        status.onchange = () => {
-          setMicPermission(status.state as "granted" | "denied" | "prompt");
-        };
-      })
-      .catch(() => setMicPermission("unknown"));
-  }, []);
-
-  // ── Device-muted detection (silent AudioContext probe) ──────────────
-  useEffect(() => {
-    async function checkMuted(): Promise<void> {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        const ctx = new AudioContext();
-        const source = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        const data = new Uint8Array(analyser.frequencyBinCount);
-
-        let silentFrames = 0;
-        let totalFrames = 0;
-        const requiredFrames = 15;
-
-        const check = (): void => {
-          analyser.getByteFrequencyData(data);
-          const avg = data.reduce((a, b) => a + b, 0) / data.length;
-          totalFrames++;
-
-          if (avg < 1) {
-            silentFrames++;
-          } else {
-            silentFrames = 0;
-            setDeviceMuted(false);
-          }
-
-          if (totalFrames >= requiredFrames) {
-            setDeviceMuted(silentFrames >= requiredFrames);
-            cleanup();
-          }
-        };
-        const interval = setInterval(check, 100);
-        const timeout = setTimeout(() => cleanup(), 2000);
-
-        function cleanup(): void {
-          clearInterval(interval);
-          clearTimeout(timeout);
-          stream.getTracks().forEach((t) => t.stop());
-          ctx.close().catch(() => {});
-        }
-      } catch {
-        // getUserMedia failed — mic permission alert handles this
-      }
-    }
-
-    if (micPermission === "granted") {
-      checkMuted();
-    }
-  }, [micPermission]);
 
   useEffect(() => {
-    knowledgeCountRef.current = knowledgeCount;
-  }, [knowledgeCount]);
+    knowledgeCountRef.current = bs.knowledgeCount;
+  }, [bs.knowledgeCount]);
 
   useEffect(() => {
     return () => {
       buildTimeoutsRef.current.forEach(clearTimeout);
+      if (lastSavedTimerRef.current) clearTimeout(lastSavedTimerRef.current);
     };
   }, []);
 
-  const finalizeSession = useCallback(async (): Promise<void> => {
-    const sid = sessionIdRef.current;
-    if (!sid) return;
-    try {
-      await fetch("/api/expertise/sessions", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sid,
-          durationSeconds: Math.floor(
-            (Date.now() - sessionStartRef.current) / 1000,
-          ),
-          knowledgeItemsAdded: knowledgeCountRef.current,
-          transcript: JSON.stringify(transcriptRef.current),
-        }),
-      });
-    } catch {
-      /* fire-and-forget */
-    }
-  }, []);
-
-  // ── Ambient sound tied to connection state ──────────────────────────
+  // ── Ambient sound ───────────────────────────────────────────────────
   useEffect(() => {
     if (isConnected && !isMuted && !ambientRef.current) {
-      const ambient = new Howl({
-        src: ["/sounds/navigate.mp3"],
-        loop: true,
-        volume: 0,
-      });
+      const ambient = new Howl({ src: ["/sounds/navigate.mp3"], loop: true, volume: 0 });
       ambient.play();
       ambient.fade(0, 0.06, 2000);
       ambientRef.current = ambient;
     }
-
     return () => {
       if (ambientRef.current) {
         ambientRef.current.fade(ambientRef.current.volume(), 0, 1000);
@@ -250,551 +120,211 @@ export default function InterviewPage(): React.ReactElement {
     };
   }, [isConnected, isMuted]);
 
-  // ── Ambient volume reacts to audio level ────────────────────────────
   useEffect(() => {
     if (ambientRef.current && isConnected) {
-      const targetVol = 0.04 + audioLevel * 0.08;
-      ambientRef.current.volume(targetVol);
+      ambientRef.current.volume(0.04 + audioLevel * 0.08);
     }
   }, [audioLevel, isConnected]);
 
-  // ── Mic audio-level loop (feeds AsciiLandscape) ─────────────────────
-  const startAudioLevelLoop = useCallback(() => {
-    const analyser = analyserRef.current;
-    if (!analyser) return;
-
-    const buf = new Uint8Array(analyser.frequencyBinCount);
-    const tick = (): void => {
-      analyser.getByteFrequencyData(buf);
-      const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
-      setAudioLevel(avg / 255);
-      animFrameRef.current = requestAnimationFrame(tick);
-    };
-    animFrameRef.current = requestAnimationFrame(tick);
-  }, []);
-
-  // ── Tool call handler ────────────────────────────────────────────────
+  // ── Tool call handler ───────────────────────────────────────────────
   const handleToolCall = useCallback(
     async (name: string, args: string, callId: string): Promise<void> => {
-      const params = JSON.parse(args) as Record<string, unknown>;
-      const profileId = profileIdRef.current;
-      let result: Record<string, unknown> = {};
+      if (name === "create_agent") createAgentArgsRef.current = { name, args, callId };
+      bs.setStatusHint(
+        name === "save_knowledge" ? "Saving an insight..."
+          : name === "assess_expertise" ? "Assessing your expertise..."
+            : name === "fetch_link" ? "Reading your link..."
+              : "Building your agent...",
+      );
 
+      let result: Record<string, unknown>;
       try {
-        switch (name) {
-          case "save_knowledge": {
-            setStatusHint("Saving an insight...");
-            const res = await fetch("/api/expertise/tools/save-knowledge", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...params,
-                profileId,
-                sessionId: sessionIdRef.current,
-              }),
-            });
-            result = await res.json();
-            setKnowledgeCount((c) => c + 1);
-            setProgress((p) => Math.min(p + 5, 95));
-            play("receive");
-            break;
+        const fx = await dispatchToolCall(name, args, bs.profileIdRef.current, rtc.sessionIdRef.current);
+        result = fx.result;
+        if (fx.knowledgeDelta) bs.setKnowledgeCount((c) => c + (fx.knowledgeDelta ?? 0));
+        if (fx.progressDelta) bs.setProgress((p) => Math.min(p + (fx.progressDelta ?? 0), 95));
+        if (fx.sound) play(fx.sound);
+        if (fx.statusHint) bs.setStatusHint(fx.statusHint);
+        if (fx.savedItem) {
+          savedDomainsRef.current.add(fx.savedItem.domain);
+          setLastSaved(fx.savedItem);
+          if (lastSavedTimerRef.current) clearTimeout(lastSavedTimerRef.current);
+          lastSavedTimerRef.current = setTimeout(() => setLastSaved(null), 3000);
+        }
+        if (fx.completedPhase) {
+          const phase = fx.completedPhase;
+          bs.setCompletedPhases((prev) => new Set([...prev, phase]));
+          const idx = INTERVIEW_PHASES.findIndex((p) => p.id === phase);
+          if (idx >= 0 && idx < INTERVIEW_PHASES.length - 1) {
+            bs.setCurrentPhase(INTERVIEW_PHASES[idx + 1].id);
           }
-          case "assess_expertise": {
-            setStatusHint("Assessing your expertise...");
-            const res = await fetch("/api/expertise/tools/assess", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...params, profileId }),
-            });
-            result = await res.json();
-            if (params.phase_completed) {
-              setProgress((p) => Math.min(p + 15, 95));
-            }
-            break;
-          }
-          case "fetch_link": {
-            setStatusHint("Reading your link...");
-            const res = await fetch("/api/expertise/tools/fetch-link", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(params),
-            });
-            result = await res.json();
-            setProgress((p) => Math.min(p + 10, 95));
-            break;
-          }
-          case "create_agent": {
-            createAgentArgsRef.current = { name, args, callId };
-            setStatusHint("Building your agent...");
-            try {
-              const res = await fetch("/api/expertise/tools/create-agent", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...params, profileId }),
-              });
-              result = (await res.json()) as Record<string, unknown>;
-              if (!res.ok) {
-                const msg =
-                  typeof result.error === "string"
-                    ? result.error
-                    : "Failed to create agent";
-                throw new Error(msg);
-              }
-              void finalizeSession();
-              buildTimeoutsRef.current.forEach(clearTimeout);
-              buildTimeoutsRef.current = [
-                setTimeout(() => {
-                  setBuildStage("building");
-                }, 1500),
-                setTimeout(() => {
-                  setBuildStage("live");
-                }, 3000),
-                setTimeout(() => {
-                  sessionStorage.setItem("agentJustCreated", "true");
-                  router.push("/done");
-                }, 5000),
-              ];
-              setCreateError(null);
-              setIsComplete(true);
-              setProgress(100);
-              play("success");
-              setBuildStage("analyzing");
-            } catch (err) {
-              setCreateError(
-                err instanceof Error ? err.message : "Failed to create agent",
-              );
-              result = {
-                error:
-                  err instanceof Error ? err.message : "Failed to create agent",
-              };
-            }
-            break;
-          }
-          default:
-            result = { error: `Unknown tool: ${name}` };
+        }
+        if (fx.createError) setCreateError(fx.createError);
+        if (fx.agentCreated) {
+          void rtc.finalizeSession(knowledgeCountRef.current, transcriptRef.current);
+          buildTimeoutsRef.current.forEach(clearTimeout);
+          buildTimeoutsRef.current = [
+            setTimeout(() => setBuildStage("analyzing"), 2500),
+            setTimeout(() => setBuildStage("building"), 5000),
+            setTimeout(() => setBuildStage("live"), 7500),
+            setTimeout(() => {
+              sessionStorage.setItem("agentJustCreated", "true");
+              router.push("/done");
+            }, 10000),
+          ];
+          setCreateError(null);
+          setIsComplete(true);
+          bs.setProgress(100);
+          bs.setCompletedPhases(new Set(INTERVIEW_PHASES.map((p) => p.id)));
+          setBuildStage("saving");
         }
       } catch (err) {
-        result = {
-          error: err instanceof Error ? err.message : "Tool call failed",
-        };
+        result = { error: err instanceof Error ? err.message : "Tool call failed" };
       }
 
-      // Return tool result to the model, then trigger its next response
-      const dc = dcRef.current;
+      const dc = rtc.dcRef.current;
       if (dc?.readyState === "open") {
-        dc.send(
-          JSON.stringify({
-            type: "conversation.item.create",
-            item: {
-              type: "function_call_output",
-              call_id: callId,
-              output: JSON.stringify(result),
-            },
-          }),
-        );
+        dc.send(JSON.stringify({
+          type: "conversation.item.create",
+          item: { type: "function_call_output", call_id: callId, output: JSON.stringify(result) },
+        }));
         dc.send(JSON.stringify({ type: "response.create" }));
       }
     },
-    [router, play, finalizeSession],
+    [router, play, rtc, bs],
   );
 
   // ── Data channel event router ───────────────────────────────────────
   const onDataChannelMessage = useCallback(
     (ev: MessageEvent): void => {
       const event: RealtimeEvent = JSON.parse(ev.data);
-
       switch (event.type) {
         case "input_audio_buffer.speech_started":
           setAudioLevel(0.6);
-          setStatusHint("Listening...");
+          bs.setStatusHint("Listening...");
           break;
-
         case "input_audio_buffer.speech_stopped":
           setAudioLevel(0.1);
           break;
-
         case "conversation.item.input_audio_transcription.completed":
           if (event.transcript) {
-            transcriptRef.current.push({
-              role: "user",
-              text: event.transcript,
-              ts: new Date().toISOString(),
-            });
+            transcriptRef.current.push({ role: "user", text: event.transcript, ts: new Date().toISOString() });
           }
           break;
-
         case "response.audio_transcript.done":
           if (event.transcript) {
-            transcriptRef.current.push({
-              role: "assistant",
-              text: event.transcript,
-              ts: new Date().toISOString(),
-            });
+            transcriptRef.current.push({ role: "assistant", text: event.transcript, ts: new Date().toISOString() });
           }
           break;
-
         case "response.output_audio_transcript.delta":
-          setStatusHint("ADIN is speaking...");
+          bs.setStatusHint("ADIN is speaking...");
           setAudioLevel(0.4);
           break;
-
         case "response.done": {
-          setStatusHint("ADIN is listening — just talk naturally");
+          bs.setStatusHint("ADIN is listening — just talk naturally");
           setAudioLevel(0.1);
-
-          // Check for function calls in the response output
-          const outputs = event.response?.output ?? [];
-          for (const item of outputs) {
-            if (
-              item.type === "function_call" &&
-              item.name &&
-              item.arguments &&
-              item.call_id
-            ) {
+          for (const item of event.response?.output ?? []) {
+            if (item.type === "function_call" && item.name && item.arguments && item.call_id) {
               handleToolCall(item.name, item.arguments, item.call_id);
             }
           }
           break;
         }
-
         case "error":
-          console.error("[realtime] Server error:", event);
+          console.error("[realtime] Server error:", event.error?.message ?? JSON.stringify(event));
+          bs.setStatusHint("Connection error — tap to retry");
           break;
-
         default:
           break;
       }
     },
-    [handleToolCall],
+    [handleToolCall, bs],
   );
 
-  // ── Start interview: WebRTC + data channel ──────────────────────────
+  /** Start the interview WebRTC session */
   async function handleStart(): Promise<void> {
     try {
       play("click");
-      setStatusHint("Connecting...");
-
-      // Acquire mic
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-      micStreamRef.current = micStream;
-
-      // Set up AnalyserNode for live audio-level visualization
-      const audioCtx = new AudioContext();
-      const source = audioCtx.createMediaStreamSource(micStream);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      // Create peer connection
-      const pc = new RTCPeerConnection();
-      pcRef.current = pc;
-
-      // Remote audio playback
-      const audioEl = document.createElement("audio");
-      audioEl.autoplay = true;
-      audioElRef.current = audioEl;
-      pc.ontrack = (e) => {
-        audioEl.srcObject = e.streams[0];
-      };
-
-      // Add mic track
-      pc.addTrack(micStream.getTracks()[0]);
-
-      // Data channel for Realtime API events
-      const dc = pc.createDataChannel("oai-events");
-      dcRef.current = dc;
-      dc.addEventListener("message", onDataChannelMessage);
-
-      // SDP offer → our server → OpenAI → answer SDP + session config
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const profileId = profileIdRef.current;
-      const sdpResponse = await fetch(
-        `/api/auth/openai-realtime?profileId=${encodeURIComponent(profileId)}`,
-        {
-          method: "POST",
-          body: offer.sdp,
-          headers: { "Content-Type": "application/sdp" },
+      bs.setStatusHint("Connecting...");
+      await rtc.connect({
+        profileId: bs.profileIdRef.current,
+        onDataChannelMessage,
+        /**
+         *
+         */
+        onConnected: () => {
+          bs.setStatusHint("ADIN is introducing itself...");
+          setIsConnected(true);
+          rtc.startAudioLevelLoop(setAudioLevel);
         },
-      );
-
-      if (!sdpResponse.ok) {
-        const errBody = await sdpResponse.text();
-        throw new Error(`SDP handshake failed: ${errBody}`);
-      }
-
-      const { sdp: answerSdp, sessionUpdate } = await sdpResponse.json();
-      await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
-
-      // Once the data channel opens, send session config (instructions, tools, etc.)
-      dc.addEventListener("open", () => {
-        dc.send(JSON.stringify(sessionUpdate));
-        setStatusHint("ADIN is listening — just talk naturally");
+        /**
+         *
+         */
+        onDisconnected: () => {
+          bs.setStatusHint("Connection lost — tap to reconnect");
+          setIsConnected(false);
+          play("error");
+        },
       });
-
-      // Resume progress is already seeded from the profile fetch on mount —
-      // no additional fetch needed here.
-
-      setIsConnected(true);
-      startAudioLevelLoop();
-
-      try {
-        const sessRes = await fetch("/api/expertise/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profileId }),
-        });
-        if (sessRes.ok) {
-          const sessionData = (await sessRes.json()) as {
-            sessionId?: string;
-          };
-          if (sessionData.sessionId) {
-            sessionIdRef.current = sessionData.sessionId;
-          }
-        }
-      } catch {
-        /* best-effort session row */
-      }
-      sessionStartRef.current = Date.now();
     } catch (err) {
       console.error("[interview] Connection failed:", err);
-      setStatusHint("Connection failed — tap to retry");
+      bs.setStatusHint("Connection failed — tap to retry");
       play("error");
     }
   }
 
-  // ── End interview: tear down WebRTC ─────────────────────────────────
+  /** End the interview and navigate to the done page */
   async function handleEnd(): Promise<void> {
     play("click");
-    await finalizeSession();
+    await rtc.finalizeSession(knowledgeCountRef.current, transcriptRef.current);
     buildTimeoutsRef.current.forEach(clearTimeout);
     buildTimeoutsRef.current = [];
-    teardown();
+    rtc.teardown();
     setIsConnected(false);
     router.push("/done");
   }
 
-  function teardown(): void {
-    cancelAnimationFrame(animFrameRef.current);
-    dcRef.current?.close();
-    pcRef.current?.close();
-    micStreamRef.current?.getTracks().forEach((t) => t.stop());
-    if (audioElRef.current) {
-      audioElRef.current.srcObject = null;
-    }
-    dcRef.current = null;
-    pcRef.current = null;
-    micStreamRef.current = null;
-    analyserRef.current = null;
-  }
-
   useEffect(() => {
-    return () => teardown();
+    return () => rtc.teardown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const showMicAlert =
-    micPermission === "denied" || micPermission === "prompt";
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center pt-20 md:pt-24 pb-36 md:pb-52 bg-black">
-      {/* Fullscreen ASCII landscape background */}
       <AsciiLandscape
         audioLevel={audioLevel}
         isActive={isConnected}
         isComplete={isComplete}
-        identity={userIdentity || undefined}
+        identity={bs.userIdentity || undefined}
       />
-
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2 backdrop-blur-md bg-black/30 rounded-full px-4 py-2">
-          <span className="text-sm font-heading text-white font-normal tracking-tight">
-            Verified Minds
-          </span>
-          <span className="text-sm font-heading text-white/30 font-semibold tracking-tight">
-            v0.1.0
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setBalanceOpen(true)}
-            className="flex items-center gap-2 backdrop-blur-md bg-black/30 rounded-full px-4 py-2
-                       hover:bg-white/10 active:scale-[0.97] transition-all cursor-pointer"
-          >
-            <span className="text-xs text-white/50 font-mono uppercase tracking-wider">
-              Balance
-            </span>
-            <span className="text-sm font-heading text-white font-semibold">
-              {balance} <span className="text-white/50">USDC</span>
-            </span>
-          </button>
-          <AnimatePresence>
-            {deviceMuted && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="flex items-center gap-1.5 backdrop-blur-md bg-amber-500/20 border border-amber-500/30
-                           rounded-full px-3 py-1.5 text-xs text-amber-300"
-              >
-                <AlertTriangle className="size-3.5 shrink-0" />
-                <span>Device muted</span>
-              </motion.div>
-            )}
-            {showMicAlert && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="flex items-center gap-1.5 backdrop-blur-md bg-red-500/20 border border-red-500/30
-                           rounded-full px-3 py-1.5 text-xs text-red-300"
-              >
-                <Mic className="size-3.5 shrink-0" />
-                <span>
-                  {micPermission === "denied" ? "Mic blocked" : "Mic required"}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </header>
-
-
-      {/* Controls overlay */}
-      <div className="relative z-20 flex flex-col items-center gap-5 max-w-2xl px-6">
-        <motion.p
-          className="text-sm text-white/60 text-center max-w-[260px]"
-          variants={fadeInUp}
-          initial="initial"
-          animate="animate"
-          transition={{ ...gentle, delay: 0.2 }}
-        >
-          {statusHint}
-        </motion.p>
-
-        {/* Time estimate pill — shown before the session starts */}
-        {!isConnected && (
-          <motion.span
-            className="inline-block rounded-full bg-white/5 border border-white/10
-                       px-3 py-1 font-mono text-xs text-white/50"
-            variants={fadeInUp}
-            initial="initial"
-            animate="animate"
-            transition={{ ...gentle, delay: 0.25 }}
-          >
-            {initialKnowledgeCount > 0
-              ? `~${estimateMinutesRemaining(initialKnowledgeCount)} min remaining`
-              : `~${TOTAL_INTERVIEW_MINUTES} min`}
-          </motion.span>
-        )}
-
-        <motion.div
-          variants={fadeInUp}
-          initial="initial"
-          animate="animate"
-          transition={{ ...gentle, delay: 0.3 }}
-        >
-          <AnimatePresence mode="wait">
-            {!isConnected ? (
-              <motion.div
-                key="start"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={gentle}
-              >
-                <Button
-                  onClick={handleStart}
-                  size="lg"
-                  className="py-6 px-8 rounded-2xl text-base shadow-lg hover:shadow-xl
-                             transition-shadow active:scale-[0.97]"
-                >
-                  {initialKnowledgeCount > 0
-                    ? "Continue Interview"
-                    : "Start Interview"}
-                </Button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="end"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={gentle}
-              >
-                <Button
-                  onClick={handleEnd}
-                  variant="ghost"
-                  className="text-white/50 hover:text-white"
-                >
-                  End early
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        <AnimatePresence>
-          {createError && (
-            <motion.div
-              key="create-error"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={gentle}
-            >
-              <Alert variant="destructive" className="max-w-md">
-                <AlertTriangle className="size-4 shrink-0" />
-                <AlertDescription className="flex flex-col gap-3">
-                  <span>{createError}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-fit border-destructive/40"
-                    onClick={() => {
-                      const stored = createAgentArgsRef.current;
-                      if (!stored) return;
-                      setCreateError(null);
-                      void handleToolCall(
-                        stored.name,
-                        stored.args,
-                        stored.callId,
-                      );
-                    }}
-                  >
-                    Retry
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Completion banner */}
-        <AnimatePresence>
-          {isComplete && buildStage === null && (
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={gentle}
-            >
-              <Alert className="border-vm-success/30 bg-vm-success-bg">
-                <CheckCircle2 className="size-4 text-vm-success" />
-                <AlertDescription className="text-vm-success font-medium">
-                  Your agent is live!
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
+      <InterviewHeader
+        balance={bs.balance}
+        deviceMuted={deviceMuted}
+        showMicAlert={showMicAlert}
+        micPermission={micPermission}
+        onBalanceClick={() => setBalanceOpen(true)}
+      />
+      <InterviewControls
+        isConnected={isConnected}
+        isComplete={isComplete}
+        buildStage={buildStage}
+        statusHint={bs.statusHint}
+        initialKnowledgeCount={bs.initialKnowledgeCount}
+        timeEstimate={
+          bs.initialKnowledgeCount > 0
+            ? `~${estimateMinutesRemaining(bs.initialKnowledgeCount)} min remaining`
+            : `~${TOTAL_INTERVIEW_MINUTES} min`
+        }
+        createError={createError}
+        onStart={handleStart}
+        onEnd={handleEnd}
+        onRetry={() => {
+          const stored = createAgentArgsRef.current;
+          if (!stored) return;
+          setCreateError(null);
+          void handleToolCall(stored.name, stored.args, stored.callId);
+        }}
+      />
       <AnimatePresence>
         {isConnected && !isComplete && buildStage === null && (
           <motion.div
@@ -806,113 +336,31 @@ export default function InterviewPage(): React.ReactElement {
             transition={gentle}
           >
             <ProgressBar
-              progress={progress}
-              itemCount={knowledgeCount}
-              estimatedMinutes={estimateMinutesRemaining(knowledgeCount)}
+              progress={bs.progress}
+              itemCount={bs.knowledgeCount}
+              estimatedMinutes={estimateMinutesRemaining(bs.knowledgeCount)}
+              currentPhase={bs.currentPhase}
+              completedPhases={bs.completedPhases}
+              lastSaved={lastSaved}
             />
           </motion.div>
         )}
       </AnimatePresence>
-
-      {buildStage !== null && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 pointer-events-none">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={buildStage}
-              className="pointer-events-none text-center px-6"
-              variants={{
-                ...fadeInUp,
-                exit: { opacity: 0, y: -12 },
-              }}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={gentle}
-            >
-              {buildStage === "live" ? (
-                <motion.p
-                  className="text-lg font-heading font-semibold text-vm-success"
-                  variants={scaleIn}
-                  initial="initial"
-                  animate="animate"
-                  transition={gentle}
-                >
-                  Your agent is live!
-                </motion.p>
-              ) : (
-                <motion.p
-                  className="text-lg font-heading font-semibold text-white/90"
-                  animate={{ opacity: [0.65, 1, 0.65] }}
-                  transition={{
-                    duration: 2.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  {buildStage === "analyzing"
-                    ? "Analyzing your knowledge..."
-                    : "Building your agent..."}
-                </motion.p>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      )}
-
+      <BuildStageOverlay
+        stage={buildStage}
+        knowledgeCount={bs.knowledgeCount}
+        domainCount={savedDomainsRef.current.size}
+      />
       <BalanceSheet
         open={balanceOpen}
         onClose={() => setBalanceOpen(false)}
-        profileId={profileIdRef.current}
+        profileId={bs.profileIdRef.current}
       />
-
-      {/* Footer — 3-column explainer */}
-      {!isConnected && (
-        <motion.footer
-          className="fixed bottom-0 left-0 right-0 z-[5] px-6 md:px-8 pb-8 md:pb-12 pt-16
-                     bg-gradient-to-t from-black/80 to-transparent pointer-events-none"
-          variants={fadeInUp}
-          initial="initial"
-          animate="animate"
-          transition={{ ...gentle, delay: 0.25 }}
-        >
-          <div className="hidden md:flex w-full max-w-3xl mx-auto justify-between">
-            {[
-              {
-                step: "01",
-                title: "Talk",
-                desc: initialKnowledgeCount > 0
-                  ? `Pick up where you left off. ~${estimateMinutesRemaining(initialKnowledgeCount)} min to go.`
-                  : "ADIN interviews you about your expertise. ~15 min, just a conversation.",
-              },
-              {
-                step: "02",
-                title: "Build",
-                desc: "Your knowledge gets extracted into a verified AI agent that thinks like you.",
-              },
-              {
-                step: "03",
-                title: "Earn",
-                desc: "Every time someone queries your agent, you get paid. Passive income, on-chain.",
-              },
-            ].map((item) => (
-              <div
-                key={item.step}
-                className="flex flex-1 max-w-[240px] flex-col gap-1.5 text-left"
-              >
-                <span className="text-xs font-mono text-vm-amber tracking-widest">
-                  {item.step}
-                </span>
-                <span className="text-sm font-heading text-white font-semibold">
-                  {item.title}
-                </span>
-                <span className="text-xs text-white/60 leading-relaxed">
-                  {item.desc}
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.footer>
-      )}
+      <InterviewFooter
+        isConnected={isConnected}
+        initialKnowledgeCount={bs.initialKnowledgeCount}
+        estimatedMinutesRemaining={estimateMinutesRemaining(bs.initialKnowledgeCount)}
+      />
     </div>
   );
 }

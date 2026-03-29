@@ -5,20 +5,24 @@
  * Tools: search_web, fetch_url, memory_save, memory_recall, delegate.
  */
 
+import type { ToolSet } from "ai";
 import { zodSchema } from "ai";
 import { z } from "zod";
 
-import { saveMemory, getPersistentMemories, getWorkingMemories } from "./memory";
-import { getCustomAgentDefinitions } from "./custom-agents";
+import { safeFetch } from "@/lib/utils/safeFetch";
+
 import { createDelegateTool, STATIC_AGENTS } from "./agents";
+import { getPersistentMemories, getWorkingMemories,saveMemory } from "./memory";
 import { buildDelegateDescription } from "./prompt";
 import type { AgentDefinition, ToolContext } from "./types";
-
-import type { ToolSet } from "ai";
 
 /**
  * Helper that builds a tool object directly, avoiding the `tool()` helper's
  * overloaded generic inference issues in AI SDK v6 + Zod 3.
+ * @param config
+ * @param config.description
+ * @param config.parameters
+ * @param config.execute
  */
 function defineTool<T extends z.ZodType>(config: {
   description: string;
@@ -41,10 +45,19 @@ const searchWebSchema = z.object({
   maxResults: z.number().optional().default(5),
 });
 
+/**
+ *
+ */
 function createSearchWebTool(): ToolSet[string] {
   return defineTool({
     description: "Search the web for current information. Returns top results with titles, URLs, and snippets.",
     parameters: searchWebSchema,
+    /**
+     *
+     * @param root0
+     * @param root0.query
+     * @param root0.maxResults
+     */
     execute: async ({ query, maxResults }) => {
       try {
         const encoded = encodeURIComponent(query);
@@ -93,15 +106,23 @@ const fetchUrlSchema = z.object({
   maxLength: z.number().optional().default(8000),
 });
 
+/**
+ *
+ */
 function createFetchUrlTool(): ToolSet[string] {
   return defineTool({
     description: "Fetch a URL and return its text content. Useful for reading articles, documentation, or data.",
     parameters: fetchUrlSchema,
+    /**
+     *
+     * @param root0
+     * @param root0.url
+     * @param root0.maxLength
+     */
     execute: async ({ url, maxLength }) => {
       try {
-        const res = await fetch(url, {
+        const res = await safeFetch(url, {
           headers: { "User-Agent": "Mozilla/5.0 (compatible; ADIN/1.0)" },
-          signal: AbortSignal.timeout(15_000),
         });
 
         if (!res.ok) {
@@ -146,12 +167,23 @@ const memorySaveSchema = z.object({
   reason: z.string().optional(),
 });
 
+/**
+ *
+ * @param ctx
+ */
 function createMemorySaveTool(ctx: ToolContext): ToolSet[string] {
   return defineTool({
     description: "Save an important fact or preference about the user for future reference.",
     parameters: memorySaveSchema,
+    /**
+     *
+     * @param root0
+     * @param root0.key
+     * @param root0.content
+     * @param root0.reason
+     */
     execute: async ({ key, content, reason }) => {
-      const entry = saveMemory({
+      const entry = await saveMemory({
         userId: ctx.userId,
         conversationId: ctx.conversationId,
         scope: "persistent",
@@ -172,20 +204,29 @@ const memoryRecallSchema = z.object({
   scope: z.enum(["persistent", "working", "all"]).optional().default("all"),
 });
 
+/**
+ *
+ * @param ctx
+ */
 function createMemoryRecallTool(ctx: ToolContext): ToolSet[string] {
   return defineTool({
     description: "Recall stored facts and preferences about the current user.",
     parameters: memoryRecallSchema,
+    /**
+     *
+     * @param root0
+     * @param root0.scope
+     */
     execute: async ({ scope }) => {
       const memories: Array<{ key: string; content: string; scope: string }> = [];
 
       if (scope === "persistent" || scope === "all") {
-        const persistent = getPersistentMemories(ctx.userId);
+        const persistent = await getPersistentMemories(ctx.userId);
         memories.push(...persistent.map((m) => ({ ...m, scope: "persistent" })));
       }
 
       if (scope === "working" || scope === "all") {
-        const working = getWorkingMemories(ctx.userId, ctx.conversationId);
+        const working = await getWorkingMemories(ctx.userId, ctx.conversationId);
         memories.push(...working.map((m) => ({ ...m, scope: "working" })));
       }
 
@@ -198,6 +239,11 @@ function createMemoryRecallTool(ctx: ToolContext): ToolSet[string] {
 // Tool factory — assembles the full tool set for a chat request
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ * @param ctx
+ * @param customAgentDefs
+ */
 export function assembleTools(
   ctx: ToolContext,
   customAgentDefs: Record<string, AgentDefinition>,
@@ -224,6 +270,11 @@ export function assembleTools(
   };
 }
 
+/**
+ *
+ * @param ctx
+ * @param agentDef
+ */
 export function assembleAgentTools(
   ctx: ToolContext,
   agentDef: AgentDefinition,

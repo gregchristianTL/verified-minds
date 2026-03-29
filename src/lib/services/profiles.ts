@@ -1,13 +1,20 @@
-import { db } from "@/lib/db";
-import { verifiedUsers, expertProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+import { db } from "@/lib/db";
+import { expertProfiles,verifiedUsers } from "@/lib/db/schema";
+
+/**
+ *
+ */
 export interface CreateProfileInput {
   worldIdHash: string;
   walletAddress?: string | null;
   verificationLevel?: string;
 }
 
+/**
+ *
+ */
 export interface ProfileResult {
   userId: string;
   profileId: string;
@@ -16,22 +23,25 @@ export interface ProfileResult {
   isNew: boolean;
 }
 
-/** Find or create a verified user and their expert profile */
-export function findOrCreateProfile(input: CreateProfileInput): ProfileResult {
-  const [existing] = db
+/**
+ * Find or create a verified user and their expert profile
+ * @param input
+ */
+export async function findOrCreateProfile(
+  input: CreateProfileInput,
+): Promise<ProfileResult> {
+  const [existing] = await db
     .select()
     .from(verifiedUsers)
     .where(eq(verifiedUsers.worldIdHash, input.worldIdHash))
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (existing) {
-    const [profile] = db
+    const [profile] = await db
       .select()
       .from(expertProfiles)
       .where(eq(expertProfiles.userId, existing.id))
-      .limit(1)
-      .all();
+      .limit(1);
 
     return {
       userId: existing.id,
@@ -46,25 +56,21 @@ export function findOrCreateProfile(input: CreateProfileInput): ProfileResult {
   const profileId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(verifiedUsers)
-    .values({
-      id: userId,
-      worldIdHash: input.worldIdHash,
-      walletAddress: input.walletAddress ?? null,
-      verificationLevel: input.verificationLevel ?? "device",
-      createdAt: now,
-    })
-    .run();
+  await db.insert(verifiedUsers).values({
+    id: userId,
+    worldIdHash: input.worldIdHash,
+    walletAddress: input.walletAddress ?? null,
+    verificationLevel: input.verificationLevel ?? "device",
+    createdAt: now,
+  });
 
-  db.insert(expertProfiles)
-    .values({
-      id: profileId,
-      userId,
-      displayName: "Expert",
-      status: "extracting",
-      createdAt: now,
-    })
-    .run();
+  await db.insert(expertProfiles).values({
+    id: profileId,
+    userId,
+    displayName: "Expert",
+    status: "extracting",
+    createdAt: now,
+  });
 
   return {
     userId,
@@ -75,25 +81,33 @@ export function findOrCreateProfile(input: CreateProfileInput): ProfileResult {
   };
 }
 
-/** Get a profile by ID */
-export function getProfile(profileId: string): typeof expertProfiles.$inferSelect | null {
-  const [profile] = db
+/**
+ * Get a profile by ID
+ * @param profileId
+ */
+export async function getProfile(
+  profileId: string,
+): Promise<typeof expertProfiles.$inferSelect | null> {
+  const [profile] = await db
     .select()
     .from(expertProfiles)
     .where(eq(expertProfiles.id, profileId))
-    .limit(1)
-    .all();
+    .limit(1);
 
   return profile ?? null;
 }
 
-/** Update profile fields */
-export function updateProfile(
+/**
+ * Update profile fields
+ * @param profileId
+ * @param updates
+ */
+export async function updateProfile(
   profileId: string,
   updates: Partial<typeof expertProfiles.$inferInsert>,
-): void {
-  db.update(expertProfiles)
+): Promise<void> {
+  await db
+    .update(expertProfiles)
     .set(updates)
-    .where(eq(expertProfiles.id, profileId))
-    .run();
+    .where(eq(expertProfiles.id, profileId));
 }

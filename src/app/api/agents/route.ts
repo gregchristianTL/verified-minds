@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { listLiveExperts } from "@/lib/services/marketplace";
+import { apiSuccess } from "@/lib/utils/apiResponse";
 import { X402_NETWORK } from "@/lib/x402/server";
 
 /**
- * Public agent index — machine-readable directory of all verified agents.
+ * GET /api/agents
+ *
+ * Public agent index -- machine-readable directory of all verified agents.
  * No auth required. Other agents/services crawl this to discover
  * available experts and their x402-gated query endpoints.
+ * @param req
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const origin = req.nextUrl.origin;
-  const experts = listLiveExperts();
+  const experts = await listLiveExperts();
   const network = X402_NETWORK;
 
   const agents = experts.map((e) => ({
@@ -29,7 +34,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     protocol: "x402",
   }));
 
-  return NextResponse.json({
+  return apiSuccess({
     agents,
     meta: {
       count: agents.length,

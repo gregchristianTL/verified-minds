@@ -11,6 +11,9 @@ export const SOUND_MAP = {
   chaChing: "/sounds/chaching.wav",
 } as const;
 
+/**
+ *
+ */
 export type SoundName = keyof typeof SOUND_MAP;
 
 /** Volume presets per sound - some should be more subtle than others */

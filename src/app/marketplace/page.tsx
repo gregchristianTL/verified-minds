@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
 import { motion } from "framer-motion";
-import ExpertCard from "@/components/ExpertCard";
-import { staggerContainer, fadeInUp, gentle } from "@/lib/motion";
-import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
+import ExpertCard from "@/components/ExpertCard";
+import { useSoundSystem } from "@/hooks/useSoundSystem";
+import { unwrap } from "@/lib/api/unwrap";
+import { fadeInUp, gentle,staggerContainer } from "@/lib/motion";
+
+/**
+ *
+ */
 interface ExpertListing {
   id: string;
   displayName: string;
@@ -17,6 +22,9 @@ interface ExpertListing {
   adinAgentId: string | null;
 }
 
+/**
+ *
+ */
 export default function MarketplacePage(): React.ReactElement {
   const [experts, setExperts] = useState<ExpertListing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,8 +32,17 @@ export default function MarketplacePage(): React.ReactElement {
 
   useEffect(() => {
     fetch("/api/expertise/marketplace")
-      .then((r) => r.json())
-      .then((data) => setExperts(data.experts ?? []))
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((json) => {
+        const data = unwrap(json);
+        setExperts(data.experts ?? []);
+      })
+      .catch((err: unknown) => {
+        console.error("Failed to load marketplace:", err);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -98,13 +115,20 @@ export default function MarketplacePage(): React.ReactElement {
         </motion.div>
       )}
 
-      <motion.div className="text-center pt-2" variants={fadeInUp} transition={gentle}>
+      <motion.div className="text-center pt-2 space-y-2" variants={fadeInUp} transition={gentle}>
         <Link
           href="/"
-          className="text-white/40 text-sm hover:text-primary transition-colors"
+          className="text-white/40 text-sm hover:text-primary transition-colors block"
           onClick={() => play("navigate")}
         >
           Want to become an expert?
+        </Link>
+        <Link
+          href="/swarm"
+          className="text-white/30 text-xs hover:text-white/60 transition-colors block"
+          onClick={() => play("navigate")}
+        >
+          Or launch a swarm to tackle complex tasks
         </Link>
       </motion.div>
     </motion.div>

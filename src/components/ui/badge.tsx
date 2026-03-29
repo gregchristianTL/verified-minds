@@ -27,6 +27,13 @@ const badgeVariants = cva(
   }
 )
 
+/**
+ *
+ * @param root0
+ * @param root0.className
+ * @param root0.variant
+ * @param root0.render
+ */
 function Badge({
   className,
   variant = "default",

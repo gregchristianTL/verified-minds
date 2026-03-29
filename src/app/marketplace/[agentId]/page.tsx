@@ -1,13 +1,15 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
+import { Check, ChevronLeft, Copy, FileText, Loader2,Terminal } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback,useEffect, useState } from "react";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { fadeInUp, staggerContainer, gentle } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
-import { ChevronLeft, Copy, Check, Terminal, FileText, Loader2 } from "lucide-react";
+import { unwrap } from "@/lib/api/unwrap";
+import { fadeInUp, gentle,staggerContainer } from "@/lib/motion";
 import type { MarketplaceListing } from "@/types";
 
 const AVATAR_COLORS = [
@@ -21,12 +23,21 @@ const AVATAR_COLORS = [
   "bg-teal-900/40 text-teal-400",
 ];
 
+/**
+ *
+ * @param name
+ */
 function nameColor(name: string): string {
   let hash = 0;
   for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+/**
+ *
+ * @param expert
+ * @param origin
+ */
 function buildDirective(expert: MarketplaceListing, origin: string): string {
   return [
     `Use this verified expert agent via x402 payment:`,
@@ -41,6 +52,11 @@ function buildDirective(expert: MarketplaceListing, origin: string): string {
   ].join("\n");
 }
 
+/**
+ *
+ * @param expert
+ * @param origin
+ */
 function buildCurl(expert: MarketplaceListing, origin: string): string {
   return [
     `curl -X POST ${origin}/api/expertise/query \\`,
@@ -53,7 +69,14 @@ function buildCurl(expert: MarketplaceListing, origin: string): string {
   ].join("\n");
 }
 
-/** Copy-to-clipboard block with label and icon */
+/**
+ * Copy-to-clipboard block with label and icon
+ * @param root0
+ * @param root0.label
+ * @param root0.icon
+ * @param root0.content
+ * @param root0.onCopy
+ */
 function CopyBlock({
   label,
   icon: Icon,
@@ -111,6 +134,9 @@ function CopyBlock({
   );
 }
 
+/**
+ *
+ */
 export default function AgentDetailPage(): React.ReactElement {
   const params = useParams();
   const agentId = params.agentId as string;
@@ -121,7 +147,10 @@ export default function AgentDetailPage(): React.ReactElement {
   useEffect(() => {
     fetch(`/api/expertise/marketplace/${agentId}`)
       .then((r) => r.json())
-      .then((data) => setExpert(data.expert ?? null))
+      .then((json) => {
+        const data = unwrap(json);
+        setExpert(data.expert ?? null);
+      })
       .finally(() => setLoading(false));
   }, [agentId]);
 

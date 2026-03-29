@@ -1,10 +1,14 @@
 "use client";
 
+import { AnimatePresence,motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { Button } from "@/components/ui/button";
 
+/**
+ *
+ */
 export default function ThemeToggle(): React.ReactElement {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);

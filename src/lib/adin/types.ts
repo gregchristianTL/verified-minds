@@ -4,6 +4,9 @@ import type { ModelMessage } from "ai";
 // Task classification
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export type TaskComplexity =
   | "trivial"
   | "simple"
@@ -13,6 +16,9 @@ export type TaskComplexity =
   | "reasoning"
   | "code";
 
+/**
+ *
+ */
 export interface TaskBudget {
   complexity: TaskComplexity;
   initialSteps: number;
@@ -25,6 +31,9 @@ export interface TaskBudget {
 // Agent definitions
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export type ModelTier =
   | "micro"
   | "fast"
@@ -32,6 +41,9 @@ export type ModelTier =
   | "power"
   | "reasoning";
 
+/**
+ *
+ */
 export interface AgentDefinition {
   id: string;
   name: string;
@@ -48,6 +60,9 @@ export interface AgentDefinition {
 // Tool context — passed through the tool factory and delegate chain
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export interface ToolContext {
   userId: string;
   conversationId: string;
@@ -59,6 +74,9 @@ export interface ToolContext {
 // Chat API request / response
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export interface ChatRequest {
   messages: ModelMessage[];
   conversationId?: string;
@@ -66,6 +84,9 @@ export interface ChatRequest {
   userId?: string;
 }
 
+/**
+ *
+ */
 export interface ChatResponse {
   id: string;
   message: { role: "assistant"; content: string };
@@ -77,6 +98,9 @@ export interface ChatResponse {
 // Delegation result — returned by the delegate tool
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export interface DelegateResult {
   type: "delegate";
   agent: string;
@@ -93,8 +117,14 @@ export interface DelegateResult {
 // Memory
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 export type MemoryScope = "working" | "persistent";
 
+/**
+ *
+ */
 export interface MemoryEntry {
   id: string;
   userId: string;

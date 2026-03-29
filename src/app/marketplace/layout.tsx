@@ -1,11 +1,17 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import AsciiLandscape from "@/components/AsciiLandscape";
-import { pageTransition, pageTransitionConfig, fadeInUp, gentle } from "@/lib/motion";
 
+import AsciiLandscape from "@/components/AsciiLandscape";
+import { fadeInUp, gentle,pageTransition, pageTransitionConfig } from "@/lib/motion";
+
+/**
+ *
+ * @param root0
+ * @param root0.children
+ */
 export default function MarketplaceLayout({
   children,
 }: {
@@ -32,6 +38,15 @@ export default function MarketplaceLayout({
             v0.1.0
           </span>
         </Link>
+
+        <nav className="flex items-center gap-2">
+          <Link
+            href="/swarm"
+            className="text-xs text-white/40 hover:text-white/70 transition-colors backdrop-blur-md bg-black/30 rounded-full px-3 py-1.5"
+          >
+            Swarm
+          </Link>
+        </nav>
       </header>
 
       {/* Page content */}

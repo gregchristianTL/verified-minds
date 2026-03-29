@@ -1,10 +1,19 @@
 "use client";
 
+/**
+ *
+ */
 interface VideoBackgroundProps {
   src: string;
   overlayOpacity?: number;
 }
 
+/**
+ *
+ * @param root0
+ * @param root0.src
+ * @param root0.overlayOpacity
+ */
 export default function VideoBackground({
   src,
   overlayOpacity = 0.4,

@@ -1,12 +1,14 @@
-import { generateText, streamText, stepCountIs, type ModelMessage } from "ai";
+import { generateText, type ModelMessage,stepCountIs, streamText } from "ai";
+
+import { logger } from "@/lib/logger";
 
 import { classifyTask } from "./classifier";
-import { getOrchestratorModel, getModel, MAX_OUTPUT_TOKENS } from "./models";
+import { saveConversation } from "./conversations";
 import { getCustomAgentDefinitions } from "./custom-agents";
 import { getPersistentMemories } from "./memory";
-import { saveConversation } from "./conversations";
-import { assembleTools } from "./tools";
+import { getModel, getOrchestratorModel, MAX_OUTPUT_TOKENS } from "./models";
 import { buildSystemPrompt } from "./prompt";
+import { assembleTools } from "./tools";
 import type { ChatRequest, ChatResponse, ToolContext } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -17,6 +19,7 @@ import type { ChatRequest, ChatResponse, ToolContext } from "./types";
  * Run the full ADIN chat pipeline:
  *
  * classify -> model select -> tools -> prompt -> generate -> persist
+ * @param request
  */
 export async function chat(
   request: ChatRequest,
@@ -32,8 +35,8 @@ export async function chat(
   const taskBudget = await classifyTask(lastMessageText);
   const modelId = getOrchestratorModel(taskBudget.complexity);
 
-  const customAgentDefs = getCustomAgentDefinitions(userId);
-  const persistentMemories = getPersistentMemories(userId);
+  const customAgentDefs = await getCustomAgentDefinitions(userId);
+  const persistentMemories = await getPersistentMemories(userId);
 
   const toolContext: ToolContext = {
     userId,
@@ -68,9 +71,11 @@ export async function chat(
   ];
 
   try {
-    saveConversation({ userId, conversationId, messages: allMessages });
-  } catch (err) {
-    console.error("[adin/engine] Failed to save conversation:", err);
+    await saveConversation({ userId, conversationId, messages: allMessages });
+  } catch (err: unknown) {
+    logger.error("Failed to save conversation", {
+      error: err instanceof Error ? err.message : "unknown",
+    });
   }
 
   const toolCalls = result.steps.flatMap((s) =>
@@ -96,6 +101,7 @@ export async function chat(
 
 /**
  * Streaming variant of the chat pipeline.
+ * @param request
  */
 export async function chatStream(
   request: ChatRequest,
@@ -111,8 +117,8 @@ export async function chatStream(
   const taskBudget = await classifyTask(lastMessageText);
   const modelId = getOrchestratorModel(taskBudget.complexity);
 
-  const customAgentDefs = getCustomAgentDefinitions(userId);
-  const persistentMemories = getPersistentMemories(userId);
+  const customAgentDefs = await getCustomAgentDefinitions(userId);
+  const persistentMemories = await getPersistentMemories(userId);
 
   const toolContext: ToolContext = {
     userId,
@@ -139,15 +145,22 @@ export async function chatStream(
     toolChoice: "auto",
     maxOutputTokens: MAX_OUTPUT_TOKENS[taskBudget.complexity],
     stopWhen: stepCountIs(taskBudget.maxSteps),
+    /**
+     *
+     * @param root0
+     * @param root0.text
+     */
     async onFinish({ text }) {
       try {
         const allMessages: ModelMessage[] = [
           ...request.messages,
           { role: "assistant", content: [{ type: "text", text }] },
         ];
-        saveConversation({ userId, conversationId, messages: allMessages });
-      } catch (err) {
-        console.error("[adin/engine] Failed to save conversation:", err);
+        await saveConversation({ userId, conversationId, messages: allMessages });
+      } catch (err: unknown) {
+        logger.error("Failed to save conversation", {
+          error: err instanceof Error ? err.message : "unknown",
+        });
       }
     },
   });
@@ -159,6 +172,10 @@ export async function chatStream(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ * @param message
+ */
 function extractText(message: ModelMessage | undefined): string {
   if (!message) return "";
   if (typeof message.content === "string") return message.content;

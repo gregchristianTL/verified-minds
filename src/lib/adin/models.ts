@@ -37,7 +37,10 @@ export const STEP_BUDGETS: Record<TaskComplexity, { initialSteps: number; maxSte
   code: { initialSteps: 6, maxSteps: 12 },
 };
 
-/** Map task complexity to the right model tier */
+/**
+ * Map task complexity to the right model tier
+ * @param complexity
+ */
 export function getOrchestratorModel(complexity: TaskComplexity): string {
   switch (complexity) {
     case "trivial":
@@ -57,12 +60,18 @@ export function getOrchestratorModel(complexity: TaskComplexity): string {
   }
 }
 
-/** Get an AI SDK LanguageModel instance for the given model ID string */
+/**
+ * Get an AI SDK LanguageModel instance for the given model ID string
+ * @param modelId
+ */
 export function getModel(modelId: string) {
   return openai(modelId);
 }
 
-/** Get a model instance for a given tier */
+/**
+ * Get a model instance for a given tier
+ * @param tier
+ */
 export function getModelForTier(tier: ModelTier) {
   return openai(MODEL_TIERS[tier]);
 }

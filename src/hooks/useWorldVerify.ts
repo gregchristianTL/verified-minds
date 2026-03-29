@@ -1,11 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import type { IErrorState,ISuccessResult } from "@worldcoin/idkit";
 import { VerificationLevel } from "@worldcoin/minikit-js";
-import type { ISuccessResult, IErrorState } from "@worldcoin/idkit";
+import { useRouter } from "next/navigation";
+import { useCallback,useEffect, useState } from "react";
+
+import { unwrap } from "@/lib/api/unwrap";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 
+const BYPASS_LOGIN =
+  process.env.NEXT_PUBLIC_BYPASS_WORLD_LOGIN === "true";
+
+/**
+ *
+ */
 interface UseWorldVerifyReturn {
   /** Trigger MiniKit verification (World App only) */
   verifyWithMiniKit: () => void;
@@ -17,6 +25,8 @@ interface UseWorldVerifyReturn {
   error: string | null;
   /** True when running inside the World App (MiniKit available) */
   isMiniKit: boolean;
+  /** True when World ID verification is bypassed via env var */
+  bypassLogin: boolean;
 }
 
 /**
@@ -38,6 +48,35 @@ export function useWorldVerify(): UseWorldVerifyReturn {
     setIsMiniKit("MiniKit" in window);
   }, []);
 
+  /** Save session data returned by any verify endpoint and navigate */
+  const persistAndNavigate = useCallback(
+    (data: Record<string, unknown>) => {
+      sessionStorage.setItem("profileId", data.profileId as string);
+      sessionStorage.setItem("userId", data.userId as string);
+      sessionStorage.setItem(
+        "knowledgeItemCount",
+        String(data.knowledgeItemCount ?? 0),
+      );
+      if (data.walletAddress) {
+        sessionStorage.setItem("walletAddress", data.walletAddress as string);
+      }
+
+      play("success");
+      router.push(
+        data.profileStatus === "live" ? "/done" : "/interview",
+      );
+    },
+    [router, play],
+  );
+
+  /** Bypass flow — skip World ID entirely and hit the demo endpoint */
+  const submitBypass = useCallback(async () => {
+    const res = await fetch("/api/expertise/verify/demo", { method: "POST" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "Bypass login failed");
+    persistAndNavigate(unwrap(json));
+  }, [persistAndNavigate]);
+
   // POST proof to our API, persist session, and navigate
   const submitProof = useCallback(
     async (proof: Record<string, unknown>, walletAddress?: string) => {
@@ -47,26 +86,14 @@ export function useWorldVerify(): UseWorldVerifyReturn {
         body: JSON.stringify({ proof, walletAddress }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Verification failed");
-
-      sessionStorage.setItem("profileId", data.profileId);
-      sessionStorage.setItem("userId", data.userId);
-      sessionStorage.setItem(
-        "knowledgeItemCount",
-        String(data.knowledgeItemCount ?? 0),
-      );
-      if (data.walletAddress) {
-        sessionStorage.setItem("walletAddress", data.walletAddress);
-      }
-
-      play("success");
-      router.push(data.profileStatus === "live" ? "/done" : "/interview");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Verification failed");
+      persistAndNavigate({ ...unwrap(json), walletAddress: walletAddress ?? null });
     },
-    [router, play],
+    [persistAndNavigate],
   );
 
-  // ── MiniKit flow (World App) ────────────────────────────────────────
+  // ── MiniKit flow (World App) — or bypass when env var is set ────────
   const verifyWithMiniKit = useCallback((): void => {
     play("click");
     setVerifying(true);
@@ -74,6 +101,11 @@ export function useWorldVerify(): UseWorldVerifyReturn {
 
     (async () => {
       try {
+        if (BYPASS_LOGIN) {
+          await submitBypass();
+          return;
+        }
+
         const { MiniKit } = await import("@worldcoin/minikit-js");
 
         if (!MiniKit.isInstalled()) {
@@ -101,22 +133,26 @@ export function useWorldVerify(): UseWorldVerifyReturn {
         setVerifying(false);
       }
     })();
-  }, [play, submitProof]);
+  }, [play, submitProof, submitBypass]);
 
-  // ── IDKit flow (browser) ────────────────────────────────────────────
+  // ── IDKit flow (browser) — or bypass when env var is set ────────────
   const handleIdKitSuccess = useCallback(
     (result: ISuccessResult): void => {
       setVerifying(true);
       setError(null);
 
-      submitProof({ ...result })
+      const action = BYPASS_LOGIN
+        ? submitBypass()
+        : submitProof({ ...result });
+
+      action
         .catch((err) => {
           setError(err instanceof Error ? err.message : "Verification failed");
           play("error");
         })
         .finally(() => setVerifying(false));
     },
-    [submitProof, play],
+    [submitProof, submitBypass, play],
   );
 
   const handleIdKitError = useCallback(
@@ -134,5 +170,6 @@ export function useWorldVerify(): UseWorldVerifyReturn {
     verifying,
     error,
     isMiniKit,
+    bypassLogin: BYPASS_LOGIN,
   };
 }

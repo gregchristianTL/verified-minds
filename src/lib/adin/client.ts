@@ -8,17 +8,20 @@
 
 import type { ModelMessage } from "ai";
 
-import { chat } from "./engine";
+import { getAgentsList } from "./agents";
 import {
   createCustomAgent as dbCreateAgent,
 } from "./custom-agents";
 import { getCustomAgentDefinitions } from "./custom-agents";
-import { getAgentsList } from "./agents";
+import { chat } from "./engine";
 
 // ---------------------------------------------------------------------------
 // Create an expert agent (stored locally)
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 interface CreateAgentParams {
   agentId: string;
   name: string;
@@ -28,6 +31,10 @@ interface CreateAgentParams {
   modelTier?: "fast" | "balanced" | "power" | "max";
 }
 
+/**
+ *
+ * @param params
+ */
 export async function createExpertAgent(
   params: CreateAgentParams,
 ): Promise<{ agentId: string }> {
@@ -54,6 +61,9 @@ export async function createExpertAgent(
 // Query an expert agent via the chat engine
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 interface ChatParams {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   conversationId?: string;
@@ -61,6 +71,10 @@ interface ChatParams {
   userId?: string;
 }
 
+/**
+ *
+ * @param params
+ */
 export async function queryExpertAgent(
   params: ChatParams,
 ): Promise<{ text: string; conversationId: string }> {
@@ -87,6 +101,9 @@ export async function queryExpertAgent(
 // List all agents (static + custom)
 // ---------------------------------------------------------------------------
 
+/**
+ *
+ */
 interface AdinAgent {
   agentId: string;
   name: string;
@@ -95,8 +112,12 @@ interface AdinAgent {
   isCustom: boolean;
 }
 
+/**
+ *
+ * @param userId
+ */
 export async function listAgents(userId?: string): Promise<{ agents: AdinAgent[] }> {
-  const customDefs = getCustomAgentDefinitions(userId);
+  const customDefs = await getCustomAgentDefinitions(userId);
   const list = getAgentsList(customDefs);
 
   return {

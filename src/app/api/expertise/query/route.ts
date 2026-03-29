@@ -1,54 +1,67 @@
+import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { withX402, resourceServer, X402_PAY_TO } from "@/lib/x402/server";
-import { sendEarningsNotification } from "@/lib/xmtp/notifications";
-import { getExpertForQuery } from "@/lib/services/marketplace";
-import { recordEarning } from "@/lib/services/earnings";
-import { getCustomAgentDefinitions } from "@/lib/adin/custom-agents";
+import { z } from "zod";
+
 import { runAgent } from "@/lib/adin/agents";
+import { getCustomAgentDefinitions } from "@/lib/adin/custom-agents";
 import { assembleAgentTools } from "@/lib/adin/tools";
 import { db } from "@/lib/db";
 import { verifiedUsers } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { logger } from "@/lib/logger";
+import { recordEarning } from "@/lib/services/earnings";
+import { getExpertForQuery } from "@/lib/services/marketplace";
+import { apiError, apiErrorFromCatch,apiSuccess } from "@/lib/utils/apiResponse";
+import { resourceServer, withX402, X402_PAY_TO } from "@/lib/x402/server";
+import { sendEarningsNotification } from "@/lib/xmtp/notifications";
 
 const QUERY_PRICE = "$0.05";
 const NETWORK = "eip155:84532"; // Base Sepolia
 
+const QuerySchema = z.object({
+  profileId: z.string().uuid(),
+  question: z.string().min(1).max(5000),
+});
+
 /**
  * Query an expert agent directly.
- * x402 payment required — $0.05 USDC on Base Sepolia.
- * Bypasses the orchestrator and calls the expert agent's runner
- * with its own system prompt, tools, and model tier.
+ * x402 payment required -- $0.05 USDC on Base Sepolia.
+ * @param req
  */
 async function handler(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const { profileId, question } = body;
-
-  if (!profileId || !question) {
-    return NextResponse.json(
-      { error: "profileId and question required" },
-      { status: 400 },
-    );
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return apiError("Invalid JSON", 400, { errorCode: "INVALID_JSON" });
   }
 
-  const expert = getExpertForQuery(profileId);
+  const parsed = QuerySchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return apiError("Invalid request", 400, {
+      errorCode: "VALIDATION_ERROR",
+      details: parsed.error.issues,
+    });
+  }
 
+  const { profileId, question } = parsed.data;
+
+  const expert = await getExpertForQuery(profileId);
   if (!expert) {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    return apiError("Agent not found", 404);
   }
 
   const { profile, domains } = expert;
 
   if (!profile.adinAgentId) {
-    return NextResponse.json({ error: "Agent not published yet" }, { status: 404 });
+    return apiError("Agent not published yet", 404);
   }
 
   try {
-    // Look up the agent definition directly and run it — no orchestrator hop
-    const customAgents = getCustomAgentDefinitions();
+    const customAgents = await getCustomAgentDefinitions();
     const agentDef = customAgents[profile.adinAgentId];
 
     if (!agentDef) {
-      return NextResponse.json({ error: "Agent definition not found" }, { status: 404 });
+      return apiError("Agent definition not found", 404);
     }
 
     const toolContext = {
@@ -68,17 +81,14 @@ async function handler(req: NextRequest): Promise<NextResponse> {
     const result = await runAgent(agentDef, question, undefined, agentTools);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error ?? "Agent failed to respond" },
-        { status: 500 },
-      );
+      return apiError(result.error ?? "Agent failed to respond", 500);
     }
 
     const amount = 0.05;
     const summary =
       question.length > 100 ? question.slice(0, 97) + "..." : question;
 
-    const earningId = recordEarning({
+    const earningId = await recordEarning({
       profileId,
       querySummary: summary,
       domainTag: domains[0] ?? null,
@@ -86,12 +96,11 @@ async function handler(req: NextRequest): Promise<NextResponse> {
       txHash: null,
     });
 
-    const [user] = db
+    const [user] = await db
       .select()
       .from(verifiedUsers)
       .where(eq(verifiedUsers.id, profile.userId))
-      .limit(1)
-      .all();
+      .limit(1);
 
     if (user?.walletAddress) {
       sendEarningsNotification({
@@ -102,15 +111,18 @@ async function handler(req: NextRequest): Promise<NextResponse> {
       }).catch(() => {});
     }
 
-    return NextResponse.json({
+    return apiSuccess({
       answer: result.response,
       earningId,
       amount,
       toolsUsed: result.toolsUsed,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Query failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error("Expert query failed", {
+      profileId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return apiErrorFromCatch(error, "Query failed");
   }
 }
 

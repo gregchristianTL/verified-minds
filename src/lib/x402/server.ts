@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
 import {
-  x402ResourceServer,
-  HTTPFacilitatorClient,
   FacilitatorResponseError,
+  HTTPFacilitatorClient,
+  x402ResourceServer,
 } from "@x402/core/server";
 import { x402HTTPResourceServer } from "@x402/core/server";
 import { registerExactEvmScheme } from "@x402/evm/exact/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const FACILITATOR_URL =
   process.env.FACILITATOR_URL ?? "https://facilitator.x402.org";
@@ -25,25 +25,51 @@ registerExactEvmScheme(resourceServer);
  * Extracts headers, path, and method from NextRequest.
  */
 class NextAdapter {
+  /**
+   *
+   * @param req
+   */
   constructor(private req: NextRequest) {}
+  /**
+   *
+   * @param name
+   */
   getHeader(name: string): string | undefined {
     return this.req.headers.get(name) || undefined;
   }
+  /**
+   *
+   */
   getMethod(): string {
     return this.req.method;
   }
+  /**
+   *
+   */
   getPath(): string {
     return this.req.nextUrl.pathname;
   }
+  /**
+   *
+   */
   getUrl(): string {
     return this.req.url;
   }
+  /**
+   *
+   */
   getAcceptHeader(): string {
     return this.req.headers.get("Accept") || "";
   }
+  /**
+   *
+   */
   getUserAgent(): string {
     return this.req.headers.get("User-Agent") || "";
   }
+  /**
+   *
+   */
   getQueryParams(): Record<string, string | string[]> {
     const params: Record<string, string | string[]> = {};
     this.req.nextUrl.searchParams.forEach((value, key) => {
@@ -57,12 +83,19 @@ class NextAdapter {
     });
     return params;
   }
+  /**
+   *
+   * @param name
+   */
   getQueryParam(name: string): string | string[] | undefined {
     const all = this.req.nextUrl.searchParams.getAll(name);
     if (all.length === 0) return undefined;
     if (all.length === 1) return all[0];
     return all;
   }
+  /**
+   *
+   */
   async getBody(): Promise<unknown> {
     try {
       return await this.req.json();
@@ -72,6 +105,9 @@ class NextAdapter {
   }
 }
 
+/**
+ *
+ */
 interface RouteConfig {
   accepts: {
     scheme: string;
@@ -87,6 +123,9 @@ interface RouteConfig {
  * Thin withX402 wrapper for Next.js 15 (the official @x402/next requires Next 16).
  * Same behavior: returns 402 if no payment, runs handler after verification,
  * settles payment after a successful response.
+ * @param routeHandler
+ * @param routeConfig
+ * @param server
  */
 export function withX402(
   routeHandler: (req: NextRequest) => Promise<NextResponse>,
@@ -181,7 +220,10 @@ export function withX402(
               { status: 502 },
             );
           }
-          console.error("[x402] Settlement failed:", error);
+          const { logger } = await import("@/lib/logger");
+          logger.error("x402 settlement failed", {
+            error: error instanceof Error ? error.message : "unknown",
+          });
           return NextResponse.json({}, { status: 402 });
         }
       }

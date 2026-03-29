@@ -1,15 +1,15 @@
+import { eq } from "drizzle-orm";
+
 import { db } from "@/lib/db";
 import { expertProfiles } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import type { MarketplaceListing } from "@/types";
 
 /** List all live expert profiles for the marketplace */
-export function listLiveExperts(): MarketplaceListing[] {
-  const profiles = db
+export async function listLiveExperts(): Promise<MarketplaceListing[]> {
+  const profiles = await db
     .select()
     .from(expertProfiles)
-    .where(eq(expertProfiles.status, "live"))
-    .all();
+    .where(eq(expertProfiles.status, "live"));
 
   return profiles
     .filter((p) => p.adinAgentId)
@@ -23,17 +23,19 @@ export function listLiveExperts(): MarketplaceListing[] {
     }));
 }
 
-/** Get a single expert by profile ID for querying */
-export function getExpertForQuery(profileId: string): {
+/**
+ * Get a single expert by profile ID for querying
+ * @param profileId
+ */
+export async function getExpertForQuery(profileId: string): Promise<{
   profile: typeof expertProfiles.$inferSelect;
   domains: string[];
-} | null {
-  const [profile] = db
+} | null> {
+  const [profile] = await db
     .select()
     .from(expertProfiles)
     .where(eq(expertProfiles.id, profileId))
-    .limit(1)
-    .all();
+    .limit(1);
 
   if (!profile?.adinAgentId) return null;
 

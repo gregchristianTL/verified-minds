@@ -1,35 +1,85 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { isSession,requireSession } from "@/lib/auth/session";
 import {
-  createSession,
+  createSession as createExtractionSession,
   finalizeSession,
   getSessionsForProfile,
 } from "@/lib/services/sessions";
+import { apiError, apiErrorFromCatch,apiSuccess } from "@/lib/utils/apiResponse";
 
-/** POST to create a new extraction session, GET to list, PATCH to finalize */
+const CreateSessionSchema = z.object({
+  profileId: z.string().uuid(),
+  realtimeSessionId: z.string().optional(),
+});
+
+const FinalizeSessionSchema = z.object({
+  sessionId: z.string().uuid(),
+  durationSeconds: z.number().int().nonnegative().optional(),
+  knowledgeItemsAdded: z.number().int().nonnegative().optional(),
+  domainsCovered: z.array(z.string()).optional(),
+  sessionSummary: z.string().optional(),
+  transcript: z.string().optional(),
+});
+
+/**
+ * POST /api/expertise/sessions — create a new extraction session.
+ * GET  /api/expertise/sessions — list sessions for the authenticated profile.
+ * PATCH /api/expertise/sessions — finalize a session with stats and transcript.
+ * @param req
+ */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const { profileId, realtimeSessionId } = body;
+  const session = await requireSession(req);
+  if (!isSession(session)) return session;
 
-  if (!profileId) {
-    return NextResponse.json({ error: "profileId required" }, { status: 400 });
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return apiError("Invalid JSON", 400, { errorCode: "INVALID_JSON" });
   }
 
-  const sessionId = createSession({ profileId, realtimeSessionId });
+  const parsed = CreateSessionSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return apiError("Invalid request", 400, {
+      errorCode: "VALIDATION_ERROR",
+      details: parsed.error.issues,
+    });
+  }
 
-  return NextResponse.json({ sessionId });
+  const { profileId, realtimeSessionId } = parsed.data;
+
+  if (profileId !== session.profileId) {
+    return apiError("Forbidden", 403);
+  }
+
+  const sessionId = await createExtractionSession({ profileId, realtimeSessionId });
+  return apiSuccess({ sessionId });
 }
 
+/**
+ *
+ * @param req
+ */
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const session = await requireSession(req);
+  if (!isSession(session)) return session;
+
   const profileId = req.nextUrl.searchParams.get("profileId");
 
   if (!profileId) {
-    return NextResponse.json({ error: "profileId required" }, { status: 400 });
+    return apiError("profileId required", 400);
+  }
+
+  if (profileId !== session.profileId) {
+    return apiError("Forbidden", 403);
   }
 
   try {
-    const sessions = getSessionsForProfile(profileId);
+    const sessions = await getSessionsForProfile(profileId);
 
-    return NextResponse.json({
+    return apiSuccess({
       sessions: sessions.map((s) => ({
         id: s.id,
         realtimeSessionId: s.realtimeSessionId,
@@ -40,45 +90,45 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         createdAt: s.createdAt,
       })),
     });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to fetch sessions";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error: unknown) {
+    return apiErrorFromCatch(error, "Failed to fetch sessions");
   }
 }
 
-/** PATCH to finalize a session with stats and transcript */
+/**
+ * PATCH to finalize a session with stats and transcript
+ * @param req
+ */
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const {
-    sessionId,
-    durationSeconds,
-    knowledgeItemsAdded,
-    domainsCovered,
-    sessionSummary,
-    transcript,
-  } = body;
+  const session = await requireSession(req);
+  if (!isSession(session)) return session;
 
-  if (!sessionId) {
-    return NextResponse.json(
-      { error: "sessionId required" },
-      { status: 400 },
-    );
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return apiError("Invalid JSON", 400, { errorCode: "INVALID_JSON" });
+  }
+
+  const parsed = FinalizeSessionSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return apiError("Invalid request", 400, {
+      errorCode: "VALIDATION_ERROR",
+      details: parsed.error.issues,
+    });
   }
 
   try {
-    finalizeSession(sessionId, {
-      durationSeconds,
-      knowledgeItemsAdded,
-      domainsCovered,
-      sessionSummary,
-      transcript,
+    await finalizeSession(parsed.data.sessionId, session.profileId, {
+      durationSeconds: parsed.data.durationSeconds,
+      knowledgeItemsAdded: parsed.data.knowledgeItemsAdded,
+      domainsCovered: parsed.data.domainsCovered,
+      sessionSummary: parsed.data.sessionSummary,
+      transcript: parsed.data.transcript,
     });
 
-    return NextResponse.json({ finalized: true });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to finalize session";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiSuccess({ finalized: true });
+  } catch (error: unknown) {
+    return apiErrorFromCatch(error, "Failed to finalize session");
   }
 }

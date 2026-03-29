@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Legal — Verified Minds",
@@ -45,6 +45,9 @@ const SECTIONS = [
   },
 ] as const;
 
+/**
+ *
+ */
 export default function LegalPage(): React.ReactElement {
   return (
     <div className="relative min-h-screen bg-background text-foreground">

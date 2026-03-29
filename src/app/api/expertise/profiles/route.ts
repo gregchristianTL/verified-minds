@@ -1,21 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { isSession,requireSession } from "@/lib/auth/session";
 import { getProfile } from "@/lib/services/profiles";
+import { apiError,apiSuccess } from "@/lib/utils/apiResponse";
 
-/** GET profile by profileId query param */
+const QuerySchema = z.object({
+  profileId: z.string().uuid(),
+});
+
+/**
+ * GET /api/expertise/profiles?profileId=...
+ *
+ * Returns the authenticated user's profile. The profileId query param
+ * must match the session's profileId to prevent IDOR.
+ * @param req
+ */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const profileId = req.nextUrl.searchParams.get("profileId");
+  const session = await requireSession(req);
+  if (!isSession(session)) return session;
 
-  if (!profileId) {
-    return NextResponse.json({ error: "profileId required" }, { status: 400 });
+  const parsed = QuerySchema.safeParse({
+    profileId: req.nextUrl.searchParams.get("profileId"),
+  });
+
+  if (!parsed.success) {
+    return apiError("profileId required (UUID)", 400, {
+      errorCode: "VALIDATION_ERROR",
+      details: parsed.error.issues,
+    });
   }
 
-  const profile = getProfile(profileId);
+  const { profileId } = parsed.data;
+
+  if (profileId !== session.profileId) {
+    return apiError("Forbidden", 403);
+  }
+
+  const profile = await getProfile(profileId);
 
   if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    return apiError("Profile not found", 404);
   }
 
-  return NextResponse.json({
+  return apiSuccess({
     id: profile.id,
     displayName: profile.displayName,
     bio: profile.bio,

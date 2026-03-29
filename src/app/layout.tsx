@@ -1,8 +1,23 @@
-import type { Metadata, Viewport } from "next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { ThemeProvider } from "@/providers/ThemeProvider";
-import { SoundProvider } from "@/providers/SoundProvider";
 import "./globals.css";
+
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
+
+import { SoundProvider } from "@/providers/SoundProvider";
+import { ThemeProvider } from "@/providers/ThemeProvider";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Verified Minds",
@@ -12,7 +27,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   themeColor: "#0F0A08",
 };
 
@@ -41,14 +55,19 @@ const HTML_COMMENT = `<!--\n${ASCII_CREDITS}\n-->`;
 
 const CONSOLE_SCRIPT = `console.log(\`%c${ASCII_CREDITS}\`,\"color:#FF00FF;font-family:monospace;font-size:11px;\");`;
 
+/**
+ *
+ * @param root0
+ * @param root0.children
+ */
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen">
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="min-h-screen font-sans">
         {/* ASCII credits easter egg — check View Source or DevTools console */}
         <span
           dangerouslySetInnerHTML={{ __html: HTML_COMMENT }}

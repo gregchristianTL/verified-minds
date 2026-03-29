@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
+import { useEffect, useRef } from "react";
 
+/**
+ *
+ */
 interface VoiceOrbProps {
   audioLevel: number;
   isActive: boolean;
@@ -13,6 +16,10 @@ interface VoiceOrbProps {
  * Warm, audio-reactive orb.
  * Amber/ember when listening, gentle green when complete.
  * Adapts colors for dark mode.
+ * @param root0
+ * @param root0.audioLevel
+ * @param root0.isActive
+ * @param root0.isComplete
  */
 export default function VoiceOrb({
   audioLevel,
@@ -41,6 +48,9 @@ export default function VoiceOrb({
     canvas.height = size * 2;
     ctx.scale(2, 2);
 
+    /**
+     *
+     */
     function draw(): void {
       if (!ctx) return;
       ctx.clearRect(0, 0, size, size);

@@ -10,6 +10,9 @@ const WORLD_APP_ID = process.env.NEXT_PUBLIC_WORLD_APP_ID ?? "";
 const WORLD_ACTION = process.env.NEXT_PUBLIC_WORLD_ACTION ?? "verify-expertise";
 const IS_DEV = process.env.NODE_ENV === "development";
 
+/**
+ *
+ */
 export interface WorldIdProof {
   merkle_root: string;
   nullifier_hash: string;
@@ -17,6 +20,10 @@ export interface WorldIdProof {
   verification_level: "orb" | "device";
 }
 
+/**
+ *
+ * @param proof
+ */
 export async function verifyWorldIdProof(
   proof: WorldIdProof,
 ): Promise<{ verified: boolean; nullifierHash: string }> {

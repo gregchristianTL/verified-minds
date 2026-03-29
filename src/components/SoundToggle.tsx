@@ -1,9 +1,13 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence,motion } from "framer-motion";
+
 import { Button } from "@/components/ui/button";
 import { useSoundStore } from "@/providers/SoundProvider";
 
+/**
+ *
+ */
 export default function SoundToggle(): React.ReactElement {
   const { isMuted, toggleMute } = useSoundStore();
 

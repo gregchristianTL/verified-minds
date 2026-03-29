@@ -1,30 +1,63 @@
+import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import { buildAndPublishAgent } from "@/lib/adin/agent-factory";
+import { isSession,requireSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { knowledgeItems } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { getProfile, updateProfile } from "@/lib/services/profiles";
-import { buildAndPublishAgent } from "@/lib/adin/agent-factory";
-import type { KnowledgeItem, DomainConfidence } from "@/types";
+import { apiError, apiErrorFromCatch,apiSuccess } from "@/lib/utils/apiResponse";
+import type { DomainConfidence,KnowledgeItem } from "@/types";
 
+const CreateAgentSchema = z.object({
+  profileId: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  domains: z.array(z.string().min(1)).min(1),
+  bio: z.string().min(1).max(2000),
+});
+
+/**
+ * POST /api/expertise/tools/create-agent
+ *
+ * Builds an expert agent from accumulated knowledge and publishes it.
+ * Requires session; profileId must match the authenticated user.
+ * @param req
+ */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const { profileId, name, domains, bio } = body;
+  const session = await requireSession(req);
+  if (!isSession(session)) return session;
 
-  if (!profileId || !name || !domains?.length || !bio) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  let rawBody: unknown;
+  try {
+    rawBody = await req.json();
+  } catch {
+    return apiError("Invalid JSON", 400, { errorCode: "INVALID_JSON" });
   }
 
-  const profile = getProfile(profileId);
+  const parsed = CreateAgentSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return apiError("Invalid request", 400, {
+      errorCode: "VALIDATION_ERROR",
+      details: parsed.error.issues,
+    });
+  }
 
+  const { profileId, name, domains, bio } = parsed.data;
+
+  if (profileId !== session.profileId) {
+    return apiError("Forbidden", 403);
+  }
+
+  const profile = await getProfile(profileId);
   if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    return apiError("Profile not found", 404);
   }
 
-  const items = db
+  const items = await db
     .select()
     .from(knowledgeItems)
-    .where(eq(knowledgeItems.profileId, profileId))
-    .all();
+    .where(eq(knowledgeItems.profileId, profileId));
 
   const typedItems: KnowledgeItem[] = items.map((i) => ({
     id: i.id,
@@ -56,7 +89,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       confidences,
     });
 
-    updateProfile(profileId, {
+    await updateProfile(profileId, {
       adinAgentId: agentId,
       displayName: name,
       bio,
@@ -64,12 +97,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       status: "live",
     });
 
-    return NextResponse.json({ agentId, status: "live" });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { error: `Failed to create agent: ${message}` },
-      { status: 500 },
-    );
+    return apiSuccess({ agentId, status: "live" });
+  } catch (error: unknown) {
+    return apiErrorFromCatch(error, "Failed to create agent");
   }
 }
