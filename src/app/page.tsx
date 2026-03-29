@@ -59,8 +59,8 @@ function LiveAgentCTA({ profileId, liveProfile }: {
   );
 }
 
-/** CTA block for new or returning (non-live) users. */
-function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, handleIdKitSuccess, handleIdKitError, verifyWithMiniKit, router }: {
+/** CTA block for new or returning (non-live) users. Always routes through World ID. */
+function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, handleIdKitSuccess, handleIdKitError, verifyWithMiniKit }: {
   returningState: ReturningState;
   verifying: boolean;
   isMiniKit: boolean;
@@ -69,7 +69,6 @@ function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, h
   handleIdKitSuccess: ReturnType<typeof useWorldVerify>["handleIdKitSuccess"];
   handleIdKitError: ReturnType<typeof useWorldVerify>["handleIdKitError"];
   verifyWithMiniKit: () => void;
-  router: ReturnType<typeof useRouter>;
 }): React.ReactElement {
   // IDKitWidget uses Radix Dialog internally without a DialogTitle.
   // Suppress the a11y warning since we can't modify the third-party widget.
@@ -82,9 +81,15 @@ function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, h
     return () => { console.error = original; };
   }, []);
 
+  const label =
+    returningState.kind === "loading" ? null
+      : returningState.kind === "in_progress" ? "Continue Interview"
+        : returningState.kind === "not_started" ? "Start Interview"
+          : "Create My Agent";
+
   return (
     <>
-      {returningState.kind === "new" && !isMiniKit && !bypassLogin ? (
+      {!isMiniKit && !bypassLogin ? (
         <IDKitWidget
           app_id={process.env.NEXT_PUBLIC_WORLD_APP_ID as `app_${string}`}
           action={process.env.NEXT_PUBLIC_WORLD_ACTION ?? "verify-expertise"}
@@ -94,28 +99,22 @@ function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, h
           autoClose
         >
           {({ open }: { open: () => void }) => (
-            <button onClick={() => { play("click"); open(); }} disabled={verifying} className={CTA_CLASS}>
+            <button
+              onClick={() => { play("click"); open(); }}
+              disabled={verifying || returningState.kind === "loading"}
+              className={CTA_CLASS}
+            >
               {verifying ? (
                 <span className="flex items-center gap-2"><Loader2 className="size-4 animate-spin" />Verifying...</span>
-              ) : "Create My Agent"}
+              ) : returningState.kind === "loading" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : label}
             </button>
           )}
         </IDKitWidget>
       ) : (
         <button
-          onClick={() => {
-            switch (returningState.kind) {
-              case "in_progress":
-              case "not_started":
-                router.push("/interview");
-                break;
-              case "live":
-                router.push("/done");
-                break;
-              default:
-                verifyWithMiniKit();
-            }
-          }}
+          onClick={() => verifyWithMiniKit()}
           disabled={verifying || returningState.kind === "loading"}
           className={CTA_CLASS}
         >
@@ -123,10 +122,7 @@ function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, h
             <span className="flex items-center gap-2"><Loader2 className="size-4 animate-spin" />Verifying...</span>
           ) : returningState.kind === "loading" ? (
             <Loader2 className="size-4 animate-spin" />
-          ) : returningState.kind === "in_progress" ? "Continue Interview"
-            : returningState.kind === "not_started" ? "Start Interview"
-            : returningState.kind === "live" ? "View My Agent"
-            : "Create My Agent"}
+          ) : label}
         </button>
       )}
       <Link href="/marketplace" className={BROWSE_CLASS}>Browse Agents</Link>
@@ -210,7 +206,7 @@ export default function MarketingPage(): React.ReactElement {
           {isLive ? (
             <LiveAgentCTA profileId={returningState.profileId} liveProfile={liveProfile} />
           ) : (
-            <DefaultCTA {...{ returningState, verifying, isMiniKit, bypassLogin, play, handleIdKitSuccess, handleIdKitError, verifyWithMiniKit, router }} />
+            <DefaultCTA {...{ returningState, verifying, isMiniKit, bypassLogin, play, handleIdKitSuccess, handleIdKitError, verifyWithMiniKit }} />
           )}
         </motion.div>
 
