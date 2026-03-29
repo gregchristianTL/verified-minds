@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { IDKitWidget, VerificationLevel } from "@worldcoin/idkit";
 import VideoBackground from "@/components/VideoBackground";
+import ExpertCard from "@/components/ExpertCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWorldVerify } from "@/hooks/useWorldVerify";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
@@ -33,12 +34,39 @@ export default function MarketingPage(): React.ReactElement {
     error,
     isMiniKit,
   } = useWorldVerify();
-  const [returningState, setReturningState] = useState<ReturningState>({ kind: "loading" });
+  const [demoLoading, setDemoLoading] = useState(false);
 
-  // Detect returning users who still have a valid session
+  /** Skip World ID — hit the demo endpoint and proceed to interview */
+  const handleDemoLogin = async (): Promise<void> => {
+    setDemoLoading(true);
+    try {
+      const res = await fetch("/api/expertise/verify/demo", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Demo login failed");
+
+      sessionStorage.setItem("profileId", data.profileId);
+      sessionStorage.setItem("userId", data.userId);
+      sessionStorage.setItem("knowledgeItemCount", String(data.knowledgeItemCount ?? 0));
+
+      play("success");
+      router.push(data.profileStatus === "live" ? "/done" : "/interview");
+    } catch {
+      setDemoLoading(false);
+    }
+  };
+
+  const [returningState, setReturningState] = useState<ReturningState>({ kind: "loading" });
+  const [liveProfile, setLiveProfile] = useState<{
+    displayName: string;
+    bio: string | null;
+    domains: string[];
+    queryPrice: string;
+  } | null>(null);
+
   useEffect(() => {
     const profileId = sessionStorage.getItem("profileId");
     if (!profileId) {
+      setLiveProfile(null);
       setReturningState({ kind: "new" });
       return;
     }
@@ -47,18 +75,31 @@ export default function MarketingPage(): React.ReactElement {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data) {
+          setLiveProfile(null);
           setReturningState({ kind: "new" });
           return;
         }
         if (data.status === "live") {
+          setLiveProfile({
+            displayName: data.displayName,
+            bio: data.bio,
+            domains: data.domains ?? [],
+            queryPrice: data.queryPrice ?? "0.05",
+          });
           setReturningState({ kind: "live", profileId });
-        } else if ((data.knowledgeItemCount ?? 0) > 0) {
-          setReturningState({ kind: "in_progress", profileId });
         } else {
-          setReturningState({ kind: "not_started", profileId });
+          setLiveProfile(null);
+          if ((data.knowledgeItemCount ?? 0) > 0) {
+            setReturningState({ kind: "in_progress", profileId });
+          } else {
+            setReturningState({ kind: "not_started", profileId });
+          }
         }
       })
-      .catch(() => setReturningState({ kind: "new" }));
+      .catch(() => {
+        setLiveProfile(null);
+        setReturningState({ kind: "new" });
+      });
   }, []);
 
   return (
@@ -98,27 +139,93 @@ export default function MarketingPage(): React.ReactElement {
 
         {/* CTAs */}
         <motion.div
-          className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-sm mx-auto"
+          className={
+            returningState.kind === "live" && liveProfile
+              ? "flex flex-col gap-4 w-full max-w-sm mx-auto"
+              : "flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-sm mx-auto"
+          }
           variants={fadeInUp}
           transition={gentle}
         >
-          {/* Browser new user → IDKit widget wraps the button */}
-          {returningState.kind === "new" && !isMiniKit ? (
-            <IDKitWidget
-              app_id={process.env.NEXT_PUBLIC_WORLD_APP_ID as `app_${string}`}
-              action={process.env.NEXT_PUBLIC_WORLD_ACTION ?? "verify-expertise"}
-              verification_level={VerificationLevel.Device}
-              onSuccess={handleIdKitSuccess}
-              onError={handleIdKitError}
-              autoClose
-            >
-              {({ open }: { open: () => void }) => (
+          {returningState.kind === "live" && liveProfile ? (
+            <>
+              <div className="w-full">
+                <ExpertCard
+                  id={returningState.profileId}
+                  displayName={liveProfile.displayName}
+                  bio={liveProfile.bio}
+                  domains={liveProfile.domains}
+                  queryPrice={liveProfile.queryPrice}
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4 w-full items-center sm:items-stretch">
+                <div className="flex items-center justify-center w-full sm:w-1/2">
+                  <Link
+                    href="/done"
+                    className="text-white/40 text-sm hover:text-primary transition-colors font-mono text-center block mt-2 sm:mt-0"
+                  >
+                    View Dashboard
+                  </Link>
+                </div>
+                <Link
+                  href="/marketplace"
+                  className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-full
+                             border border-white/20 text-white/90 font-heading font-medium text-base
+                             backdrop-blur-md bg-white/5
+                             hover:bg-white/10 hover:border-white/30
+                             transition-all active:scale-[0.97] cursor-pointer"
+                >
+                  Browse Agents
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              {returningState.kind === "new" && !isMiniKit ? (
+                <IDKitWidget
+                  app_id={process.env.NEXT_PUBLIC_WORLD_APP_ID as `app_${string}`}
+                  action={process.env.NEXT_PUBLIC_WORLD_ACTION ?? "verify-expertise"}
+                  verification_level={VerificationLevel.Device}
+                  onSuccess={handleIdKitSuccess}
+                  onError={handleIdKitError}
+                  autoClose
+                >
+                  {({ open }: { open: () => void }) => (
+                    <button
+                      onClick={() => {
+                        play("click");
+                        open();
+                      }}
+                      disabled={verifying}
+                      className={CTA_CLASS}
+                    >
+                      {verifying ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" />
+                          Verifying...
+                        </span>
+                      ) : (
+                        "Create My Agent"
+                      )}
+                    </button>
+                  )}
+                </IDKitWidget>
+              ) : (
                 <button
                   onClick={() => {
-                    play("click");
-                    open();
+                    switch (returningState.kind) {
+                      case "in_progress":
+                      case "not_started":
+                        router.push("/interview");
+                        break;
+                      case "live":
+                        router.push("/done");
+                        break;
+                      default:
+                        verifyWithMiniKit();
+                    }
                   }}
-                  disabled={verifying}
+                  disabled={verifying || returningState.kind === "loading"}
                   className={CTA_CLASS}
                 >
                   {verifying ? (
@@ -126,59 +233,42 @@ export default function MarketingPage(): React.ReactElement {
                       <Loader2 className="size-4 animate-spin" />
                       Verifying...
                     </span>
+                  ) : returningState.kind === "loading" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : returningState.kind === "in_progress" ? (
+                    "Continue Interview"
+                  ) : returningState.kind === "not_started" ? (
+                    "Start Interview"
+                  ) : returningState.kind === "live" ? (
+                    "View My Agent"
                   ) : (
                     "Create My Agent"
                   )}
                 </button>
               )}
-            </IDKitWidget>
-          ) : (
-            <button
-              onClick={() => {
-                switch (returningState.kind) {
-                  case "in_progress":
-                  case "not_started":
-                    router.push("/interview");
-                    break;
-                  case "live":
-                    router.push("/done");
-                    break;
-                  default:
-                    // MiniKit new user or loading fallback
-                    verifyWithMiniKit();
-                }
-              }}
-              disabled={verifying || returningState.kind === "loading"}
-              className={CTA_CLASS}
-            >
-              {verifying ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="size-4 animate-spin" />
-                  Verifying...
-                </span>
-              ) : returningState.kind === "loading" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : returningState.kind === "in_progress" ? (
-                "Continue Interview"
-              ) : returningState.kind === "not_started" ? (
-                "Start Interview"
-              ) : returningState.kind === "live" ? (
-                "View My Agent"
-              ) : (
-                "Create My Agent"
+              <Link
+                href="/marketplace"
+                className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-full
+                           border border-white/20 text-white/90 font-heading font-medium text-base
+                           backdrop-blur-md bg-white/5
+                           hover:bg-white/10 hover:border-white/30
+                           transition-all active:scale-[0.97] cursor-pointer"
+              >
+                Browse Agents
+              </Link>
+
+              {/* Demo shortcut — visible when the user hasn't verified yet */}
+              {returningState.kind === "new" && (
+                <button
+                  onClick={handleDemoLogin}
+                  disabled={demoLoading}
+                  className="text-white/30 text-xs font-mono hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {demoLoading ? "Logging in…" : "Demo Log In"}
+                </button>
               )}
-            </button>
+            </>
           )}
-          <Link
-            href="/marketplace"
-            className="inline-flex items-center justify-center h-12 w-full sm:w-1/2 rounded-full
-                       border border-white/20 text-white/90 font-heading font-medium text-base
-                       backdrop-blur-md bg-white/5
-                       hover:bg-white/10 hover:border-white/30
-                       transition-all active:scale-[0.97] cursor-pointer"
-          >
-            Browse Agents
-          </Link>
         </motion.div>
 
         {/* Powered by World ID */}

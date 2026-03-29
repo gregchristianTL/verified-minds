@@ -45,6 +45,8 @@ export const extractionSessions = sqliteTable("extraction_sessions", {
   /** JSON array of domains covered this session */
   domainsCovered: text("domains_covered").default("[]"),
   sessionSummary: text("session_summary"),
+  /** JSON array of { role, text, ts } transcript entries */
+  transcript: text("transcript"),
   createdAt: text("created_at").notNull(),
 });
 

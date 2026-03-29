@@ -3,7 +3,7 @@ import { getProfile, updateProfile } from "@/lib/services/profiles";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await req.json();
-  const { profileId, domain, confidence, phaseCompleted } = body;
+  const { profileId, domain, confidence, phase_completed } = body;
 
   if (!profileId || !domain || confidence === undefined) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -34,6 +34,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     updated: true,
     confidenceMap: currentMap,
     domains: currentDomains,
-    phaseCompleted: phaseCompleted ?? null,
+    phase_completed: phase_completed ?? null,
   });
 }

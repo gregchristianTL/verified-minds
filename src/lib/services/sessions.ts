@@ -24,7 +24,7 @@ export function createSession(input: CreateSessionInput): string {
   return id;
 }
 
-/** Update session with final stats */
+/** Update session with final stats and optional transcript */
 export function finalizeSession(
   sessionId: string,
   stats: {
@@ -32,6 +32,7 @@ export function finalizeSession(
     knowledgeItemsAdded?: number;
     domainsCovered?: string[];
     sessionSummary?: string;
+    transcript?: string;
   },
 ): void {
   db.update(extractionSessions)
@@ -42,6 +43,7 @@ export function finalizeSession(
         ? JSON.stringify(stats.domainsCovered)
         : undefined,
       sessionSummary: stats.sessionSummary,
+      transcript: stats.transcript,
     })
     .where(eq(extractionSessions.id, sessionId))
     .run();
