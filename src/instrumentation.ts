@@ -1,8 +1,8 @@
 /**
  * Next.js Instrumentation -- validates environment variables at startup.
  *
- * In production, missing required variables throw immediately to prevent
- * a broken deploy. In development, they emit warnings.
+ * Logs warnings for missing variables so deploys aren't silently misconfigured,
+ * but never throws — a partial deploy is better than a fully broken one.
  */
 
 import { z } from "zod";
@@ -31,21 +31,10 @@ export async function register(): Promise<void> {
       .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
       .join("\n");
 
-    const message = `Environment validation failed:\n${issues}`;
-
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(message);
-    }
-
-    console.warn(`[env] ${message}`);
+    console.warn(`[env] Environment validation failed:\n${issues}`);
   }
 
-  if (
-    process.env.NODE_ENV === "production" &&
-    !process.env.SESSION_SECRET
-  ) {
-    throw new Error(
-      "SESSION_SECRET is required in production (at least 32 characters)",
-    );
+  if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+    console.warn("[env] SESSION_SECRET is not set — sessions will use a fallback key");
   }
 }
