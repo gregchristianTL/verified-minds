@@ -37,7 +37,11 @@ const MAX_DEPTH = 5;
 const SWARM_CHAT_MODEL =
   process.env.OPENAI_SWARM_MODEL?.trim() || "gpt-4o-mini";
 
-const openai = new OpenAI();
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) _openai = new OpenAI();
+  return _openai;
+}
 
 // ---- Helpers ----
 
@@ -144,7 +148,7 @@ async function runExplorePhase(
 
     for (const agent of shuffled) {
       try {
-        const decision = await agentDecide(openai, SWARM_CHAT_MODEL, agent, sub.content, allContents, completedWork);
+        const decision = await agentDecide(getOpenAI(), SWARM_CHAT_MODEL, agent, sub.content, allContents, completedWork);
         if (!decision) continue;
 
         if (decision.accept) {
@@ -162,7 +166,7 @@ async function runExplorePhase(
             const subResult = await runPipeline(sub.id, sub.content, depth + 1, startedAt);
             result = subResult.deliverable || `Sub-swarm explored ${subResult.completedWork.length} aspects of "${sub.content}".`;
           } else {
-            result = await agentWork(openai, agent, sub.content, decision.approach, completedWork);
+            result = await agentWork(getOpenAI(), agent, sub.content, decision.approach, completedWork);
           }
 
           await post({
@@ -225,7 +229,7 @@ async function runCritiquePhase(
     if (!persona) continue;
 
     try {
-      const critiqueText = await agentCritique(openai, persona, ownWork, target, content);
+      const critiqueText = await agentCritique(getOpenAI(), persona, ownWork, target, content);
       if (!critiqueText.trim()) continue;
 
       critiques.push({
@@ -269,7 +273,7 @@ export async function runPipeline(
 ): Promise<PipelineResult> {
   if (depth > MAX_DEPTH) {
     log(SWARM_ID, `Max depth (${depth}), using direct completion`);
-    const deliverable = await runDirectCompletion(openai, {
+    const deliverable = await runDirectCompletion(getOpenAI(), {
       system: "You are a specialist AI. Complete the following task thoroughly and concisely. Use markdown formatting.",
       user: `Task: "${content}"`,
       temperature: 0.65,
@@ -286,7 +290,7 @@ export async function runPipeline(
 
   let plan: Awaited<ReturnType<typeof decomposeAndPlan>>;
   try {
-    plan = await decomposeAndPlan(openai, SWARM_CHAT_MODEL, content, depth);
+    plan = await decomposeAndPlan(getOpenAI(), SWARM_CHAT_MODEL, content, depth);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     log(SWARM_ID, `Decomposition failed: ${msg}`);
@@ -335,7 +339,7 @@ export async function runPipeline(
 
   let deliverable: string;
   try {
-    deliverable = await synthesizeDeliverable(openai, content, completedWork, critiques, plan.manifest, depth);
+    deliverable = await synthesizeDeliverable(getOpenAI(), content, completedWork, critiques, plan.manifest, depth);
   } catch {
     deliverable = `Swarm finished with ${completedWork.length}/${subIntentIds.length} sub-goals by ${plan.manifest.agents.length} agents.`;
   }
