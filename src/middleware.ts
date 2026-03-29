@@ -49,6 +49,7 @@ function getRateLimit(pathname: string): number | null {
  * @returns true if the caller should be throttled
  */
 function isRateLimited(key: string, limit: number): boolean {
+  purgeExpired();
   const now = Date.now();
   const bucket = rateLimitStore.get(key);
 
@@ -61,12 +62,16 @@ function isRateLimited(key: string, limit: number): boolean {
   return bucket.count > limit;
 }
 
-setInterval(() => {
+/**
+ * Lazily purge expired rate-limit buckets on each check instead of using
+ * setInterval, which is unsupported in Vercel's Edge Runtime.
+ */
+function purgeExpired(): void {
   const now = Date.now();
   for (const [key, bucket] of rateLimitStore) {
     if (now >= bucket.resetAt) rateLimitStore.delete(key);
   }
-}, RATE_WINDOW_MS);
+}
 
 // ---------------------------------------------------------------------------
 // Middleware handler
