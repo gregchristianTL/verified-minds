@@ -230,7 +230,7 @@ export default function MarketingPage(): React.ReactElement {
         )}
       </motion.div>
 
-      {returningState.kind === "new" && (
+      {returningState.kind !== "loading" && returningState.kind !== "live" && (
         <button
           onClick={handleDemoLogin}
           disabled={demoLoading}
