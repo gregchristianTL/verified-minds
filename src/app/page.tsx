@@ -257,16 +257,6 @@ export default function MarketingPage(): React.ReactElement {
                 Browse Agents
               </Link>
 
-              {/* Demo shortcut — visible when the user hasn't verified yet */}
-              {returningState.kind === "new" && (
-                <button
-                  onClick={handleDemoLogin}
-                  disabled={demoLoading}
-                  className="text-white/30 text-xs font-mono hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {demoLoading ? "Logging in…" : "Demo Log In"}
-                </button>
-              )}
             </>
           )}
         </motion.div>
@@ -304,6 +294,17 @@ export default function MarketingPage(): React.ReactElement {
           </motion.div>
         )}
       </motion.div>
+
+      {/* Demo shortcut — above the footer */}
+      {returningState.kind === "new" && (
+        <button
+          onClick={handleDemoLogin}
+          disabled={demoLoading}
+          className="absolute bottom-14 z-10 text-white/30 text-xs font-mono hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {demoLoading ? "Logging in…" : "Demo Log In"}
+        </button>
+      )}
 
       {/* Footer */}
       <footer className="absolute bottom-0 inset-x-0 z-[1] py-5 px-6 text-center pointer-events-none">
