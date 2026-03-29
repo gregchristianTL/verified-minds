@@ -20,8 +20,10 @@ const envSchema = z.object({
   ADIN_API_KEY: z.string().optional(),
 });
 
-/** Validate environment variables at application startup */
+/** Validate environment variables at application startup (Node.js only) */
 export async function register(): Promise<void> {
+  if (typeof (globalThis as Record<string, unknown>).EdgeRuntime !== "undefined") return;
+
   const result = envSchema.safeParse(process.env);
 
   if (!result.success) {
