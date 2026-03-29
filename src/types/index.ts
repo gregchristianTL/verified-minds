@@ -51,7 +51,7 @@ export interface EarningsEntry {
   id: string;
   querySummary: string | null;
   domainTag: string | null;
-  amount: string;
+  amount: number;
   txHash: string | null;
   createdAt: string;
 }
