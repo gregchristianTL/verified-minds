@@ -62,7 +62,7 @@ export default function MarketplaceLayout({
         <p className="font-mono text-xs text-white/30">
           Verified Minds{" "}
           <Link href="/legal" className="text-white/40 hover:text-white/60 transition-colors">
-            v0.0.1
+            v0.1.0
           </Link>
           {" "}&middot; Built by{" "}
           <a

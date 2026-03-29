@@ -210,7 +210,7 @@ export default function DonePage(): React.ReactElement {
 
       <footer className="absolute bottom-0 inset-x-0 z-10 py-5 px-6 text-center">
         <p className="font-mono text-xs text-white/30">
-          Verified Minds v0.0.1 &middot; Built by{" "}
+          Verified Minds v0.1.0 &middot; Built by{" "}
           <a
             href="https://tributelabs.xyz"
             target="_blank"

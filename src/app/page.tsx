@@ -306,11 +306,11 @@ export default function MarketingPage(): React.ReactElement {
       </motion.div>
 
       {/* Footer */}
-      <footer className="absolute bottom-0 inset-x-0 z-10 py-5 px-6 text-center">
-        <p className="font-mono text-xs text-white/30">
+      <footer className="absolute bottom-0 inset-x-0 z-[1] py-5 px-6 text-center pointer-events-none">
+        <p className="font-mono text-xs text-white/30 pointer-events-auto">
           Verified Minds{" "}
           <Link href="/legal" className="text-white/40 hover:text-white/60 transition-colors">
-            v0.0.1
+            v0.1.0
           </Link>
           {" "}&middot; Built by{" "}
           <a href="https://tributelabs.xyz" target="_blank" rel="noopener noreferrer"

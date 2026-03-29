@@ -600,7 +600,7 @@ export default function InterviewPage(): React.ReactElement {
     micPermission === "denied" || micPermission === "prompt";
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center bg-black">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center pt-20 md:pt-24 pb-36 md:pb-52 bg-black">
       {/* Fullscreen ASCII landscape background */}
       <AsciiLandscape
         audioLevel={audioLevel}
@@ -666,7 +666,7 @@ export default function InterviewPage(): React.ReactElement {
 
 
       {/* Controls overlay */}
-      <div className="relative z-10 flex flex-col items-center gap-5 max-w-2xl px-6">
+      <div className="relative z-20 flex flex-col items-center gap-5 max-w-2xl px-6">
         <motion.p
           className="text-sm text-white/60 text-center max-w-[260px]"
           variants={fadeInUp}
@@ -868,14 +868,14 @@ export default function InterviewPage(): React.ReactElement {
       {/* Footer — 3-column explainer */}
       {!isConnected && (
         <motion.footer
-          className="fixed bottom-0 left-0 right-0 z-10 px-8 pb-12 pt-16
-                     bg-gradient-to-t from-black/80 to-transparent"
+          className="fixed bottom-0 left-0 right-0 z-[5] px-6 md:px-8 pb-8 md:pb-12 pt-16
+                     bg-gradient-to-t from-black/80 to-transparent pointer-events-none"
           variants={fadeInUp}
           initial="initial"
           animate="animate"
           transition={{ ...gentle, delay: 0.25 }}
         >
-          <div className="flex w-full justify-between">
+          <div className="hidden md:flex w-full max-w-3xl mx-auto justify-between">
             {[
               {
                 step: "01",
@@ -897,7 +897,7 @@ export default function InterviewPage(): React.ReactElement {
             ].map((item) => (
               <div
                 key={item.step}
-                className="flex w-[240px] flex-col gap-1.5 text-left"
+                className="flex flex-1 max-w-[240px] flex-col gap-1.5 text-left"
               >
                 <span className="text-xs font-mono text-vm-amber tracking-widest">
                   {item.step}
