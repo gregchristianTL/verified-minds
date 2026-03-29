@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import AsciiLandscape from "@/components/AsciiLandscape";
 import EarningsFeed from "@/components/EarningsFeed";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { staggerContainer, fadeInUp, scaleIn, gentle } from "@/lib/motion";
+import { staggerContainer, fadeInUp, scaleIn, gentle, fadeIn } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { Loader2, Mic } from "lucide-react";
 import BalanceSheet from "@/components/BalanceSheet";
@@ -30,15 +31,73 @@ interface EarningsData {
   }>;
 }
 
+interface ProfileData {
+  id: string;
+  displayName: string;
+  bio: string | null;
+  domains: string[];
+  confidenceMap: Record<string, number>;
+  knowledgeItemCount: number;
+  adinAgentId: string | null;
+  status: string;
+  queryPrice: string;
+}
+
+const AVATAR_COLORS = [
+  "bg-amber-900/40 text-amber-400",
+  "bg-orange-900/40 text-orange-400",
+  "bg-emerald-900/40 text-emerald-400",
+  "bg-rose-900/40 text-rose-400",
+  "bg-sky-900/40 text-sky-400",
+  "bg-violet-900/40 text-violet-400",
+  "bg-red-900/40 text-red-400",
+  "bg-teal-900/40 text-teal-400",
+];
+
+function nameColor(name: string): string {
+  let hash = 0;
+  for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function displayInitials(displayName: string): string {
+  const initials = displayName
+    .split(" ")
+    .map((w) => w[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return initials || "?";
+}
+
+function confidenceDotClass(score: number): string {
+  if (score >= 70) return "bg-emerald-400";
+  if (score >= 40) return "bg-amber-400";
+  return "bg-red-400";
+}
+
 export default function DonePage(): React.ReactElement {
   const router = useRouter();
   const [data, setData] = useState<EarningsData | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState("0.00");
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [profileId, setProfileId] = useState("");
   const [userIdentity, setUserIdentity] = useState("");
+  const [celebrateEntrance, setCelebrateEntrance] = useState(false);
   const { play } = useSoundSystem();
+
+  useEffect(() => {
+    if (sessionStorage.getItem("agentJustCreated")) {
+      setCelebrateEntrance(true);
+      const t = window.setTimeout(() => {
+        sessionStorage.removeItem("agentJustCreated");
+      }, 100);
+      return () => window.clearTimeout(t);
+    }
+  }, []);
 
   useEffect(() => {
     const profileId = sessionStorage.getItem("profileId");
@@ -56,11 +115,13 @@ export default function DonePage(): React.ReactElement {
 
     async function load(): Promise<void> {
       try {
-        const res = await fetch(
-          `/api/expertise/earnings?profileId=${profileId}`,
-        );
-        if (res.ok) {
-          const newData: EarningsData = await res.json();
+        const [earningsRes, profileRes] = await Promise.all([
+          fetch(`/api/expertise/earnings?profileId=${profileId}`),
+          fetch(`/api/expertise/profiles?profileId=${profileId}`),
+        ]);
+
+        if (earningsRes.ok) {
+          const newData: EarningsData = await earningsRes.json();
           setData((prev) => {
             if (prev && newData.transactions.length > prev.transactions.length) {
               play("success");
@@ -69,19 +130,25 @@ export default function DonePage(): React.ReactElement {
           });
           setBalance(parseFloat(newData.totalEarnings || "0").toFixed(2));
         }
+
+        if (profileRes.ok) {
+          const p: ProfileData = await profileRes.json();
+          setProfile(p);
+        } else {
+          setProfile(null);
+        }
       } finally {
         setLoading(false);
       }
     }
 
-    load();
-    const interval = setInterval(load, 10_000);
-    return () => clearInterval(interval);
+    void load();
+    const interval = window.setInterval(() => void load(), 10_000);
+    return () => window.clearInterval(interval);
   }, [play]);
 
   return (
     <div className="relative min-h-screen w-full flex flex-col items-center justify-center">
-      {/* ASCII landscape background — static idle state */}
       <AsciiLandscape
         audioLevel={0}
         isActive={false}
@@ -89,9 +156,9 @@ export default function DonePage(): React.ReactElement {
         identity={userIdentity || undefined}
       />
 
-      {/* Header — balance */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3">
         <button
+          type="button"
           onClick={() => setBalanceOpen(true)}
           className="flex items-center gap-2 backdrop-blur-md bg-black/30 rounded-full px-4 py-2
                      hover:bg-white/10 active:scale-[0.97] transition-all cursor-pointer"
@@ -101,7 +168,6 @@ export default function DonePage(): React.ReactElement {
         </button>
       </header>
 
-      {/* Content */}
       <div className="relative z-10">
         {loading ? (
           <div className="flex items-center justify-center">
@@ -125,7 +191,14 @@ export default function DonePage(): React.ReactElement {
         ) : data.status !== "live" ? (
           <InterviewIncomplete play={play} router={router} />
         ) : (
-          <AgentLive data={data} play={play} />
+          <AgentLive
+            data={data}
+            profile={profile}
+            profileId={profileId}
+            play={play}
+            celebrateEntrance={celebrateEntrance}
+            router={router}
+          />
         )}
       </div>
 
@@ -135,7 +208,6 @@ export default function DonePage(): React.ReactElement {
         profileId={profileId}
       />
 
-      {/* Footer */}
       <footer className="absolute bottom-0 inset-x-0 z-10 py-5 px-6 text-center">
         <p className="font-mono text-xs text-white/30">
           Verified Minds v0.0.1 &middot; Built by{" "}
@@ -170,8 +242,6 @@ export default function DonePage(): React.ReactElement {
     </div>
   );
 }
-
-/* ── Sub-components ── */
 
 function InterviewIncomplete({
   play,
@@ -230,72 +300,178 @@ function InterviewIncomplete({
 
 function AgentLive({
   data,
+  profile,
+  profileId,
   play,
+  celebrateEntrance,
+  router,
 }: {
   data: EarningsData;
+  profile: ProfileData | null;
+  profileId: string;
   play: (name: SoundName) => void;
+  celebrateEntrance: boolean;
+  router: ReturnType<typeof useRouter>;
 }): React.ReactElement {
+  const displayName = profile?.displayName ?? data.displayName;
+  const bio = profile?.bio ?? null;
+  const domains = profile?.domains?.length ? profile.domains : data.domains;
+  const knowledgeCount = profile?.knowledgeItemCount ?? 0;
+  const confidenceEntries = Object.entries(profile?.confidenceMap ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  const marketplaceId = profile?.id ?? profileId;
+  const avatarClass = nameColor(displayName);
+
+  const cardClass =
+    "w-full max-w-md flex flex-col items-center gap-6 backdrop-blur-lg bg-black/20 rounded-3xl px-8 py-10";
+
+  const liveBadge = (
+    <Badge
+      variant="secondary"
+      className="gap-2 px-3.5 py-1.5 rounded-full bg-vm-success-bg text-vm-success border-0"
+    >
+      <motion.div
+        className="w-2 h-2 rounded-full bg-vm-success"
+        animate={{ opacity: [1, 0.4, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <span className="font-heading text-xs">Your agent is live</span>
+    </Badge>
+  );
+
+  const identityBlock = (
+    <div className="w-full flex flex-col items-center text-center gap-3">
+      <Avatar className={`w-16 h-16 text-lg font-heading ${avatarClass}`}>
+        <AvatarFallback className={avatarClass}>{displayInitials(displayName)}</AvatarFallback>
+      </Avatar>
+      <h2 className="font-heading text-2xl font-medium tracking-tight text-white">{displayName}</h2>
+      {bio ? (
+        <p className="text-white/60 text-sm leading-relaxed max-w-sm">{bio}</p>
+      ) : null}
+      {domains.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 justify-center">
+          {domains.map((d) => (
+            <span
+              key={d}
+              className="text-[11px] h-6 inline-flex items-center px-2.5 rounded-full bg-white/[0.12] text-white/80 font-mono"
+            >
+              {d}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const knowledgeBlock = (
+    <div className="w-full space-y-2 text-center">
+      <p className="text-xs text-white/50 font-mono">
+        {knowledgeCount} knowledge items extracted
+      </p>
+      {confidenceEntries.length > 0 ? (
+        <ul className="flex flex-col gap-1 items-center text-[11px] text-white/45 font-mono">
+          {confidenceEntries.map(([domain, score]) => (
+            <li key={domain} className="inline-flex items-center gap-2">
+              <span
+                className={`size-1.5 shrink-0 rounded-full ${confidenceDotClass(score)}`}
+                aria-hidden
+              />
+              <span>
+                {domain}{" "}
+                <span className="text-white/35">({Math.round(score)})</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+
+  const statusCopy = (
+    <p className="text-sm text-white/50 text-center leading-relaxed max-w-sm">
+      Your agent is online in the Verified Minds marketplace. When another AI or person queries your
+      agent, you earn USDC automatically.
+    </p>
+  );
+
+  const cta = (
+    <Button
+      size="lg"
+      className="w-full py-6 rounded-2xl text-base font-heading font-medium shadow-lg hover:shadow-xl transition-shadow active:scale-[0.98]"
+      onClick={() => {
+        play("click");
+        router.push(`/marketplace/${marketplaceId}`);
+      }}
+    >
+      View in Marketplace
+    </Button>
+  );
+
+  const earningsBlock = (
+    <div className="w-full flex justify-center">
+      <EarningsFeed totalEarnings={data.totalEarnings} transactions={data.transactions} />
+    </div>
+  );
+
+  const browseLink = (
+    <Link
+      href="/marketplace"
+      className="text-white/40 text-sm hover:text-primary transition-colors font-mono"
+      onClick={() => play("navigate")}
+    >
+      Browse marketplace
+    </Link>
+  );
+
+  if (celebrateEntrance) {
+    return (
+      <motion.div
+        className={cardClass}
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+      >
+        <motion.div variants={scaleIn} transition={gentle}>
+          {liveBadge}
+        </motion.div>
+        <motion.div variants={fadeInUp} transition={gentle} className="w-full">
+          {identityBlock}
+        </motion.div>
+        <motion.div variants={fadeInUp} transition={gentle} className="w-full">
+          {knowledgeBlock}
+        </motion.div>
+        <motion.div variants={fadeInUp} transition={gentle} className="w-full">
+          {statusCopy}
+        </motion.div>
+        <motion.div variants={fadeInUp} transition={gentle} className="w-full">
+          {cta}
+        </motion.div>
+        <motion.div variants={fadeInUp} transition={gentle} className="w-full">
+          {earningsBlock}
+        </motion.div>
+        <motion.div variants={fadeInUp} transition={gentle}>
+          {browseLink}
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
-      className="w-full max-w-md flex flex-col items-center gap-6 backdrop-blur-lg bg-black/20 rounded-3xl px-8 py-10"
-      variants={staggerContainer}
+      className={cardClass}
+      variants={fadeIn}
       initial="initial"
       animate="animate"
+      transition={gentle}
     >
-      {/* Live badge */}
-      <motion.div variants={scaleIn} transition={gentle}>
-        <Badge
-          variant="secondary"
-          className="gap-2 px-3.5 py-1.5 rounded-full bg-vm-success-bg text-vm-success border-0"
-        >
-          <motion.div
-            className="w-2 h-2 rounded-full bg-vm-success"
-            animate={{ opacity: [1, 0.4, 1] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <span className="font-heading text-xs">Your agent is live</span>
-        </Badge>
-      </motion.div>
-
-      <motion.div variants={fadeInUp} transition={gentle} className="w-full flex justify-center">
-        <EarningsFeed
-          totalEarnings={data.totalEarnings}
-          transactions={data.transactions}
-        />
-      </motion.div>
-
-      {/* Domain tags */}
-      <AnimatePresence>
-        {data.domains.length > 0 && (
-          <motion.div
-            className="flex flex-wrap gap-2 justify-center"
-            variants={fadeInUp}
-            transition={gentle}
-          >
-            {data.domains.map((d, i) => (
-              <motion.div
-                key={d}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 + i * 0.05, ...gentle }}
-              >
-                <Badge variant="secondary" className="font-mono text-xs">{d}</Badge>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Browse marketplace link */}
-      <motion.div variants={fadeInUp} transition={gentle}>
-        <Link
-          href="/marketplace"
-          className="text-white/40 text-sm hover:text-primary transition-colors font-mono"
-          onClick={() => play("navigate")}
-        >
-          Browse marketplace
-        </Link>
-      </motion.div>
+      <div>{liveBadge}</div>
+      <div className="w-full">{identityBlock}</div>
+      <div className="w-full">{knowledgeBlock}</div>
+      <div className="w-full">{statusCopy}</div>
+      <div className="w-full">{cta}</div>
+      <div className="w-full">{earningsBlock}</div>
+      <div>{browseLink}</div>
     </motion.div>
   );
 }

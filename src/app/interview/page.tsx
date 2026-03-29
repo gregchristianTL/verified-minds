@@ -7,15 +7,17 @@ import { Howl } from "howler";
 import AsciiLandscape from "@/components/AsciiLandscape";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fadeInUp, gentle } from "@/lib/motion";
+import { fadeInUp, gentle, scaleIn } from "@/lib/motion";
 import { useSoundSystem } from "@/hooks/useSoundSystem";
 import { useSoundStore } from "@/providers/SoundProvider";
 import { CheckCircle2, AlertTriangle, Mic } from "lucide-react";
 import BalanceSheet from "@/components/BalanceSheet";
+import ProgressBar from "@/components/ProgressBar";
 
 /** Realtime API server event shape (subset we care about) */
 interface RealtimeEvent {
   type: string;
+  transcript?: string;
   event_id?: string;
   response?: {
     output?: {
@@ -55,8 +57,24 @@ export default function InterviewPage(): React.ReactElement {
   >("unknown");
   const [deviceMuted, setDeviceMuted] = useState(false);
   const [balanceOpen, setBalanceOpen] = useState(false);
+  const [buildStage, setBuildStage] = useState<
+    "analyzing" | "building" | "live" | null
+  >(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const profileIdRef = useRef<string>("");
+  const sessionIdRef = useRef<string>("");
+  const sessionStartRef = useRef<number>(0);
+  const transcriptRef = useRef<Array<{ role: string; text: string; ts: string }>>(
+    [],
+  );
+  const knowledgeCountRef = useRef<number>(0);
+  const createAgentArgsRef = useRef<{
+    name: string;
+    args: string;
+    callId: string;
+  } | null>(null);
+  const buildTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const ambientRef = useRef<Howl | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -178,6 +196,37 @@ export default function InterviewPage(): React.ReactElement {
     }
   }, [micPermission]);
 
+  useEffect(() => {
+    knowledgeCountRef.current = knowledgeCount;
+  }, [knowledgeCount]);
+
+  useEffect(() => {
+    return () => {
+      buildTimeoutsRef.current.forEach(clearTimeout);
+    };
+  }, []);
+
+  const finalizeSession = useCallback(async (): Promise<void> => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    try {
+      await fetch("/api/expertise/sessions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sid,
+          durationSeconds: Math.floor(
+            (Date.now() - sessionStartRef.current) / 1000,
+          ),
+          knowledgeItemsAdded: knowledgeCountRef.current,
+          transcript: JSON.stringify(transcriptRef.current),
+        }),
+      });
+    } catch {
+      /* fire-and-forget */
+    }
+  }, []);
+
   // ── Ambient sound tied to connection state ──────────────────────────
   useEffect(() => {
     if (isConnected && !isMuted && !ambientRef.current) {
@@ -226,8 +275,8 @@ export default function InterviewPage(): React.ReactElement {
 
   // ── Tool call handler ────────────────────────────────────────────────
   const handleToolCall = useCallback(
-    async (name: string, args: string, callId: string) => {
-      const params = JSON.parse(args);
+    async (name: string, args: string, callId: string): Promise<void> => {
+      const params = JSON.parse(args) as Record<string, unknown>;
       const profileId = profileIdRef.current;
       let result: Record<string, unknown> = {};
 
@@ -238,7 +287,11 @@ export default function InterviewPage(): React.ReactElement {
             const res = await fetch("/api/expertise/tools/save-knowledge", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...params, profileId }),
+              body: JSON.stringify({
+                ...params,
+                profileId,
+                sessionId: sessionIdRef.current,
+              }),
             });
             result = await res.json();
             setKnowledgeCount((c) => c + 1);
@@ -271,17 +324,50 @@ export default function InterviewPage(): React.ReactElement {
             break;
           }
           case "create_agent": {
+            createAgentArgsRef.current = { name, args, callId };
             setStatusHint("Building your agent...");
-            const res = await fetch("/api/expertise/tools/create-agent", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...params, profileId }),
-            });
-            result = await res.json();
-            setIsComplete(true);
-            setProgress(100);
-            play("success");
-            setTimeout(() => router.push("/done"), 3000);
+            try {
+              const res = await fetch("/api/expertise/tools/create-agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...params, profileId }),
+              });
+              result = (await res.json()) as Record<string, unknown>;
+              if (!res.ok) {
+                const msg =
+                  typeof result.error === "string"
+                    ? result.error
+                    : "Failed to create agent";
+                throw new Error(msg);
+              }
+              void finalizeSession();
+              buildTimeoutsRef.current.forEach(clearTimeout);
+              buildTimeoutsRef.current = [
+                setTimeout(() => {
+                  setBuildStage("building");
+                }, 1500),
+                setTimeout(() => {
+                  setBuildStage("live");
+                }, 3000),
+                setTimeout(() => {
+                  sessionStorage.setItem("agentJustCreated", "true");
+                  router.push("/done");
+                }, 5000),
+              ];
+              setCreateError(null);
+              setIsComplete(true);
+              setProgress(100);
+              play("success");
+              setBuildStage("analyzing");
+            } catch (err) {
+              setCreateError(
+                err instanceof Error ? err.message : "Failed to create agent",
+              );
+              result = {
+                error:
+                  err instanceof Error ? err.message : "Failed to create agent",
+              };
+            }
             break;
           }
           default:
@@ -309,12 +395,12 @@ export default function InterviewPage(): React.ReactElement {
         dc.send(JSON.stringify({ type: "response.create" }));
       }
     },
-    [router, play],
+    [router, play, finalizeSession],
   );
 
   // ── Data channel event router ───────────────────────────────────────
   const onDataChannelMessage = useCallback(
-    (ev: MessageEvent) => {
+    (ev: MessageEvent): void => {
       const event: RealtimeEvent = JSON.parse(ev.data);
 
       switch (event.type) {
@@ -325,6 +411,26 @@ export default function InterviewPage(): React.ReactElement {
 
         case "input_audio_buffer.speech_stopped":
           setAudioLevel(0.1);
+          break;
+
+        case "conversation.item.input_audio_transcription.completed":
+          if (event.transcript) {
+            transcriptRef.current.push({
+              role: "user",
+              text: event.transcript,
+              ts: new Date().toISOString(),
+            });
+          }
+          break;
+
+        case "response.audio_transcript.done":
+          if (event.transcript) {
+            transcriptRef.current.push({
+              role: "assistant",
+              text: event.transcript,
+              ts: new Date().toISOString(),
+            });
+          }
           break;
 
         case "response.output_audio_transcript.delta":
@@ -435,6 +541,25 @@ export default function InterviewPage(): React.ReactElement {
 
       setIsConnected(true);
       startAudioLevelLoop();
+
+      try {
+        const sessRes = await fetch("/api/expertise/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileId }),
+        });
+        if (sessRes.ok) {
+          const sessionData = (await sessRes.json()) as {
+            sessionId?: string;
+          };
+          if (sessionData.sessionId) {
+            sessionIdRef.current = sessionData.sessionId;
+          }
+        }
+      } catch {
+        /* best-effort session row */
+      }
+      sessionStartRef.current = Date.now();
     } catch (err) {
       console.error("[interview] Connection failed:", err);
       setStatusHint("Connection failed — tap to retry");
@@ -443,8 +568,11 @@ export default function InterviewPage(): React.ReactElement {
   }
 
   // ── End interview: tear down WebRTC ─────────────────────────────────
-  function handleEnd(): void {
+  async function handleEnd(): Promise<void> {
     play("click");
+    await finalizeSession();
+    buildTimeoutsRef.current.forEach(clearTimeout);
+    buildTimeoutsRef.current = [];
     teardown();
     setIsConnected(false);
     router.push("/done");
@@ -611,9 +739,45 @@ export default function InterviewPage(): React.ReactElement {
           </AnimatePresence>
         </motion.div>
 
+        <AnimatePresence>
+          {createError && (
+            <motion.div
+              key="create-error"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={gentle}
+            >
+              <Alert variant="destructive" className="max-w-md">
+                <AlertTriangle className="size-4 shrink-0" />
+                <AlertDescription className="flex flex-col gap-3">
+                  <span>{createError}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-fit border-destructive/40"
+                    onClick={() => {
+                      const stored = createAgentArgsRef.current;
+                      if (!stored) return;
+                      setCreateError(null);
+                      void handleToolCall(
+                        stored.name,
+                        stored.args,
+                        stored.callId,
+                      );
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Completion banner */}
         <AnimatePresence>
-          {isComplete && (
+          {isComplete && buildStage === null && (
             <motion.div
               initial={{ opacity: 0, y: 12, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -630,6 +794,70 @@ export default function InterviewPage(): React.ReactElement {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {isConnected && !isComplete && buildStage === null && (
+          <motion.div
+            key="interview-progress"
+            className="fixed bottom-8 left-1/2 z-30 -translate-x-1/2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={gentle}
+          >
+            <ProgressBar
+              progress={progress}
+              itemCount={knowledgeCount}
+              estimatedMinutes={estimateMinutesRemaining(knowledgeCount)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {buildStage !== null && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 pointer-events-none">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={buildStage}
+              className="pointer-events-none text-center px-6"
+              variants={{
+                ...fadeInUp,
+                exit: { opacity: 0, y: -12 },
+              }}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={gentle}
+            >
+              {buildStage === "live" ? (
+                <motion.p
+                  className="text-lg font-heading font-semibold text-vm-success"
+                  variants={scaleIn}
+                  initial="initial"
+                  animate="animate"
+                  transition={gentle}
+                >
+                  Your agent is live!
+                </motion.p>
+              ) : (
+                <motion.p
+                  className="text-lg font-heading font-semibold text-white/90"
+                  animate={{ opacity: [0.65, 1, 0.65] }}
+                  transition={{
+                    duration: 2.2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                >
+                  {buildStage === "analyzing"
+                    ? "Analyzing your knowledge..."
+                    : "Building your agent..."}
+                </motion.p>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
 
       <BalanceSheet
         open={balanceOpen}
