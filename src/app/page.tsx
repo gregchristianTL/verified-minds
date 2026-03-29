@@ -196,7 +196,7 @@ export default function MarketingPage(): React.ReactElement {
 
         <motion.div className="space-y-4" variants={fadeInUp} transition={gentle}>
           <h1 className="font-heading text-4xl sm:text-5xl font-medium tracking-tight text-white" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.5)" }}>Your expertise has value.</h1>
-          <p className="text-white/70 text-lg leading-relaxed max-w-lg mx-auto whitespace-nowrap" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>Turn what you know into an AI agent that earns for you.</p>
+          <p className="text-white/70 text-lg leading-relaxed max-w-lg mx-auto px-4" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>Turn what you know into an AI agent that earns for you.</p>
         </motion.div>
 
         <motion.div
