@@ -71,6 +71,17 @@ function DefaultCTA({ returningState, verifying, isMiniKit, bypassLogin, play, h
   verifyWithMiniKit: () => void;
   router: ReturnType<typeof useRouter>;
 }): React.ReactElement {
+  // IDKitWidget uses Radix Dialog internally without a DialogTitle.
+  // Suppress the a11y warning since we can't modify the third-party widget.
+  useEffect(() => {
+    const original = console.error;
+    console.error = (...args: unknown[]) => {
+      if (typeof args[0] === "string" && args[0].includes("`DialogContent` requires a `DialogTitle`")) return;
+      original.apply(console, args);
+    };
+    return () => { console.error = original; };
+  }, []);
+
   return (
     <>
       {returningState.kind === "new" && !isMiniKit && !bypassLogin ? (
@@ -130,6 +141,27 @@ export default function MarketingPage(): React.ReactElement {
   const router = useRouter();
   const { play } = useSoundSystem();
   const { verifyWithMiniKit, handleIdKitSuccess, handleIdKitError, verifying, error, isMiniKit, bypassLogin } = useWorldVerify();
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleDemoLogin = async (): Promise<void> => {
+    setDemoLoading(true);
+    try {
+      const res = await fetch("/api/expertise/verify/demo", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Demo login failed");
+
+      const data = unwrap(json);
+
+      sessionStorage.setItem("profileId", data.profileId);
+      sessionStorage.setItem("userId", data.userId);
+      sessionStorage.setItem("knowledgeItemCount", String(data.knowledgeItemCount ?? 0));
+
+      play("success");
+      router.push(data.profileStatus === "live" ? "/done" : "/interview");
+    } catch {
+      setDemoLoading(false);
+    }
+  };
 
   const [returningState, setReturningState] = useState<ReturningState>({ kind: "loading" });
   const [liveProfile, setLiveProfile] = useState<{
@@ -197,6 +229,16 @@ export default function MarketingPage(): React.ReactElement {
           </motion.div>
         )}
       </motion.div>
+
+      {returningState.kind === "new" && (
+        <button
+          onClick={handleDemoLogin}
+          disabled={demoLoading}
+          className="absolute bottom-14 z-10 text-white/30 text-xs font-mono hover:text-primary transition-colors cursor-pointer disabled:opacity-50"
+        >
+          {demoLoading ? "Logging in…" : "Demo Log In"}
+        </button>
+      )}
 
       <footer className="absolute bottom-0 inset-x-0 z-[1] py-5 px-6 text-center pointer-events-none">
         <p className="font-mono text-xs text-white/30 pointer-events-auto">

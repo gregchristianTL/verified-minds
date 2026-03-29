@@ -38,9 +38,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return apiError("Forbidden", 403);
   }
 
+  const useProfileId = profileId || session.profileId;
+  const resumeContext = await buildResumeContext(useProfileId);
+  const instructions = buildProfilerPrompt(resumeContext ?? undefined);
+
   const sessionConfig = JSON.stringify({
     type: "realtime",
     model: "gpt-realtime",
+    instructions,
     audio: { output: { voice: "coral" } },
   });
 
@@ -68,16 +73,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const answerSdp = await response.text();
 
-    const useProfileId = profileId || session.profileId;
-    const resumeContext = await buildResumeContext(useProfileId);
-    const instructions = buildProfilerPrompt(resumeContext ?? undefined);
-
     return NextResponse.json({
       sdp: answerSdp,
       sessionUpdate: {
         type: "session.update",
         session: {
-          instructions,
+          type: "realtime",
+          input_audio_transcription: { model: "gpt-4o-mini-transcribe", language: "en" },
           tools: PROFILER_TOOLS,
           tool_choice: "auto",
           turn_detection: { type: "semantic_vad" },

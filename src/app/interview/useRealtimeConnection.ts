@@ -163,9 +163,21 @@ export function useRealtimeConnection(): RealtimeConnection {
       const { sdp: answerSdp, sessionUpdate } = await sdpRes.json();
       await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
       dc.addEventListener("open", () => {
-        dc.send(JSON.stringify(sessionUpdate));
-        dc.send(JSON.stringify({ type: "response.create" }));
-        onConnected();
+        if (sessionUpdate) {
+          const onSessionReady = (ev: MessageEvent): void => {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === "session.updated") {
+              dc.removeEventListener("message", onSessionReady);
+              dc.send(JSON.stringify({ type: "response.create" }));
+              onConnected();
+            }
+          };
+          dc.addEventListener("message", onSessionReady);
+          dc.send(JSON.stringify(sessionUpdate));
+        } else {
+          dc.send(JSON.stringify({ type: "response.create" }));
+          onConnected();
+        }
       });
 
       try {

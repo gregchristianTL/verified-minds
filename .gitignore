@@ -9,3 +9,4 @@ db.sqlite-wal
 .env.local
 *.tsbuildinfo
 drizzle/meta/
+.vercel

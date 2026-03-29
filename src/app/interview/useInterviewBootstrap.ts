@@ -48,7 +48,7 @@ export function useInterviewBootstrap(
   const [completedPhases, setCompletedPhases] = useState<Set<string>>(
     new Set(),
   );
-  const [statusHint, setStatusHint] = useState("Tap to begin your interview");
+  const [statusHint, setStatusHint] = useState("");
 
   useEffect(() => {
     const storedProfileId = sessionStorage.getItem("profileId") ?? "";

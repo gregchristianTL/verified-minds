@@ -55,14 +55,13 @@ export default function InterviewFooter({
 
   return (
     <motion.footer
-      className="fixed bottom-0 left-0 right-0 z-5 px-6 md:px-8 pb-8 md:pb-12 pt-16
-                 bg-linear-to-t from-black/80 to-transparent pointer-events-none"
+      className="relative z-5 px-6 md:px-8 mt-10 pointer-events-none"
       variants={fadeInUp}
       initial="initial"
       animate="animate"
       transition={{ ...gentle, delay: 0.25 }}
     >
-      <div className="flex flex-col md:flex-row w-full max-w-3xl mx-auto justify-between gap-4 md:gap-0">
+      <div className="flex flex-col md:flex-row w-full max-w-3xl mx-auto justify-between gap-4 md:gap-8">
         {steps.map((item) => (
           <div
             key={item.step}

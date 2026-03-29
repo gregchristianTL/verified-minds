@@ -290,7 +290,7 @@ export default function InterviewPage(): React.ReactElement {
   }, []);
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col items-center justify-center pt-20 md:pt-24 pb-36 md:pb-52 bg-black">
+    <div className="relative min-h-screen w-full flex flex-col items-center justify-center pt-20 md:pt-24 pb-16 md:pb-20 bg-black">
       <AsciiLandscape
         audioLevel={audioLevel}
         isActive={isConnected}
